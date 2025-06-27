@@ -116,7 +116,7 @@ class CH9120Model:
         devices = CH9120Model.get_by_line(line)
         tasks = []
         for device in devices:
-            print(f'START SEND COMMAND TO LINE[{device['station_name']}]: {device['ip']}')
+            # print(f'START SEND COMMAND TO LINE[{device['station_name']}]: {device['ip']}')
             service = CH9120Services(device['ip'], device['port'])
             task = asyncio.create_task(service.send_command(hex_command, duration))
             tasks.append(task)

@@ -56,7 +56,7 @@ def send_command(line, command, duration):
         payload = {"line": line, "mode": command}
         if duration:
             payload["duration"] = int(duration)
-        print(f"[API] Sending to {payload['line']} - {payload['mode']} - {payload['duration']}")
+        print(f"[API] Sending to {line} - {command} - {duration}")
 
     try:
         response = requests.post(url, json=payload)
