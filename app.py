@@ -22,11 +22,9 @@ def get_ip():
             continue
     return None
 
-HOST_IP = get_ip()
+HOST_IP = "10.30.148.95"
 API_BASE_URL = f"http://{HOST_IP}:5000/ch9120"
-
 COMMANDS = CH9120_COMMANDS
-print('COMMANDS', COMMANDS)
 
 def fetch_lines():
     try:
@@ -53,13 +51,13 @@ def send_command(line, command, duration):
         payload = {"mode": command}
         if duration:
             payload["duration"] = int(duration)
-        print('payload', payload)
     else:
         url = f"{API_BASE_URL}/send-command/line"
         payload = {"line": line, "mode": command}
         if duration:
             payload["duration"] = int(duration)
-        print('payload', payload)
+        print(f"[API] Sending to {payload['line']} - {payload['mode']} - {payload['duration']}")
+
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
@@ -133,7 +131,8 @@ app.register_blueprint(blueprint, url_prefix="/ch9120")
 
 
 def run_flask():
-    host_ip = get_ip() if get_ip() else '0.0.0.0'
+    # host_ip = get_ip() if get_ip() else '0.0.0.0'
+    host_ip = "10.30.148.95"
     app.run(host=host_ip, port=5000)
 
 if __name__ == '__main__':

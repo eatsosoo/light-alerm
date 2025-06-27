@@ -82,13 +82,10 @@ class CH9120Model:
     async def send_command_to_all(hex_command, duration):
         try:
             devices = CH9120Model.get_all()
-            tasks = []
-            print("START SEND COMMAND TO ALL")
-            
-            print(devices)
+            tasks = []            
 
             for device in devices:
-                print(f"Sending to {device['ip']}:{device['port']} - {device}")
+                print(f"[APP] Sending to {device['ip']}:{device['port']} - {device}")
 
                 service = CH9120Services(device['ip'], device['port'])
                 task = asyncio.create_task(service.send_command(hex_command, duration))
@@ -117,11 +114,9 @@ class CH9120Model:
     @staticmethod
     async def send_command_by_line(line, hex_command, duration):
         devices = CH9120Model.get_by_line(line)
-        print(devices)
         tasks = []
-        print('START SEND COMMAND TO LINE')
         for device in devices:
-            print(device)
+            print(f'START SEND COMMAND TO LINE[{device['station_name']}]: {device['ip']}')
             service = CH9120Services(device['ip'], device['port'])
             task = asyncio.create_task(service.send_command(hex_command, duration))
             tasks.append(task)
