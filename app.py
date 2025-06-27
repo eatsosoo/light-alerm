@@ -71,56 +71,95 @@ def create_ui():
     root = tk.Tk()
     root.title("Device Control Panel")
     root.geometry("900x500")
+    root.configure(bg="#1a1a1a")
 
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    # Treeview styling
+    style.configure("Treeview",
+                    font=("Arial", 11),
+                    rowheight=30,
+                    background="#1e1e1e",
+                    fieldbackground="#1e1e1e",
+                    foreground="white",
+                    borderwidth=0)
+    style.configure("Treeview.Heading",
+                    font=("Arial", 12, "bold"),
+                    borderwidth=0,
+                    background="#333333",
+                    foreground="white")
+    style.map("Treeview",
+              background=[("selected", "#444444")],
+              foreground=[("selected", "white")])
+
+    # Filter section
     lines = fetch_lines()
-    devices = fetch_devices_by_line("All")
     selected_line = tk.StringVar(value="All")
 
-    filter_frame = tk.Frame(root)
+    filter_frame = tk.Frame(root, bg="#1a1a1a")
     filter_frame.pack(fill="x", padx=10, pady=5)
 
-    tk.Label(filter_frame, text="Filter by Line:").pack(side="left", padx=5)
-    line_filter = ttk.Combobox(filter_frame, textvariable=selected_line, values=["All"] + lines, state="readonly")
+    tk.Label(filter_frame, text="Filter by Line:", fg="white", bg="#1a1a1a", font=("Arial", 10)).pack(side="left", padx=5)
+
+    line_filter = ttk.Combobox(filter_frame, textvariable=selected_line, values=["All"] + lines, state="readonly", width=14)
     line_filter.pack(side="left", padx=5)
 
-    tk.Label(filter_frame, text="Duration (optional):").pack(side="left", padx=5)
-    duration_entry = tk.Entry(filter_frame, width=5)
+    tk.Label(filter_frame, text="Duration (optional):", fg="white", bg="#1a1a1a", font=("Arial", 10)).pack(side="left", padx=5)
+
+    duration_entry = tk.Entry(filter_frame, width=6, bg="#2b2b2b", fg="white", insertbackground="white",
+                              relief="flat", highlightbackground="#444", highlightthickness=1, bd=4)
     duration_entry.pack(side="left", padx=5)
 
+    # Treeview
     columns = ("IP", "Port", "Line", "Station")
     tree = ttk.Treeview(root, columns=columns, show="headings", height=10)
+    tree.configure(style="Custom.Treeview")
 
+    style.configure("Custom.Treeview",
+        bordercolor="#2a2a2a",  # giả lập màu viền
+        borderwidth=1,
+        relief="solid",
+        background="#1e1e1e",
+        fieldbackground="#1e1e1e",
+        foreground="white"
+    )
+    
     for col in columns:
         tree.heading(col, text=col)
-        tree.column(col, anchor="center", width=120)
+        tree.column(col, anchor="center", width=140)
+
+    # Row background alternate colors
+    tree.tag_configure("odd", background="#1e1e1e")
+    tree.tag_configure("even", background="#262626")
 
     tree.pack(fill="both", expand=True, padx=10, pady=5)
 
     def update_device_list():
-        selected = selected_line.get()
         tree.delete(*tree.get_children())
-
-        filtered_devices = fetch_devices_by_line(selected)
-        for device in filtered_devices:
-            tree.insert("", "end", values=(device['ip'], device['port'], device['line'], device['station_name']))
+        selected = selected_line.get()
+        devices = fetch_devices_by_line(selected)
+        for idx, device in enumerate(devices):
+            tag = "even" if idx % 2 == 0 else "odd"
+            tree.insert("", "end", values=(device['ip'], device['port'], device['line'], device['station_name']), tags=(tag,))
 
     line_filter.bind("<<ComboboxSelected>>", lambda event: update_device_list())
-
     update_device_list()
 
-    btn_frame = tk.Frame(root)
+    # Button area
+    btn_frame = tk.Frame(root, bg="#1a1a1a")
     btn_frame.pack(fill="x", padx=10, pady=10)
 
     def send_to_selected_line(command):
         line = selected_line.get()
         duration = duration_entry.get().strip()
-        if line == "All":
-            send_command("All", command, duration)
-        else:
-            send_command(line, command, duration)
+        send_command(line, command, duration)
 
     for cmd in COMMANDS:
-        btn = tk.Button(btn_frame, text=cmd, font=("Arial", 10), command=lambda c=cmd: send_to_selected_line(c))
+        btn = tk.Button(btn_frame, text=cmd, font=("Arial", 10, "bold"),
+                        bg="#000000", fg="white", activebackground="#333333", activeforeground="white",
+                        relief="flat", padx=15, pady=8, bd=0, highlightthickness=1, highlightbackground="#444")
+        btn.configure(command=lambda c=cmd: send_to_selected_line(c))
         btn.pack(side="left", padx=5, pady=5)
 
     root.mainloop()
