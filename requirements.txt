@@ -5,3 +5,4 @@ PyYAML
 pyodbc
 netifaces
 flask[async]
+pyinstaller
