@@ -85,7 +85,7 @@ class CH9120Model:
             tasks = []            
 
             for device in devices:
-                print(f"[APP] Sending to {device['ip']}:{device['port']} - {device}")
+                print(f"[APP] Sending to {device['ip']}:{device['port']} - {device['station_name']}")
 
                 service = CH9120Services(device['ip'], device['port'])
                 task = asyncio.create_task(service.send_command(hex_command, duration))

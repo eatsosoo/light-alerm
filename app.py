@@ -22,7 +22,8 @@ def get_ip():
             continue
     return None
 
-HOST_IP = "10.30.148.95"
+# HOST_IP = "10.30.148.95"
+HOST_IP = get_ip()
 API_BASE_URL = f"http://{HOST_IP}:5000/ch9120"
 COMMANDS = CH9120_COMMANDS
 
@@ -70,7 +71,7 @@ def send_command(line, command, duration):
 def create_ui():
     root = tk.Tk()
     root.title("Device Control Panel")
-    root.geometry("900x500")
+    root.geometry("800x500")
     root.configure(bg="#1a1a1a")
 
     style = ttk.Style()
@@ -78,7 +79,7 @@ def create_ui():
 
     # Treeview styling
     style.configure("Treeview",
-                    font=("Arial", 11),
+                    font=("Arial", 10),
                     rowheight=30,
                     background="#1e1e1e",
                     fieldbackground="#1e1e1e",
@@ -155,12 +156,15 @@ def create_ui():
         duration = duration_entry.get().strip()
         send_command(line, command, duration)
 
-    for cmd in COMMANDS:
+    max_per_row = 6
+    for i, cmd in enumerate(COMMANDS):
         btn = tk.Button(btn_frame, text=cmd, font=("Arial", 10, "bold"),
                         bg="#000000", fg="white", activebackground="#333333", activeforeground="white",
-                        relief="flat", padx=15, pady=8, bd=0, highlightthickness=1, highlightbackground="#444")
+                        relief="flat", padx=15, pady=8, width=10)
         btn.configure(command=lambda c=cmd: send_to_selected_line(c))
-        btn.pack(side="left", padx=5, pady=5)
+        row = i // max_per_row
+        col = i % max_per_row
+        btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
 
     root.mainloop()
 
@@ -170,8 +174,8 @@ app.register_blueprint(blueprint, url_prefix="/ch9120")
 
 
 def run_flask():
-    # host_ip = get_ip() if get_ip() else '0.0.0.0'
-    host_ip = "10.30.148.95"
+    host_ip = get_ip() if get_ip() else '0.0.0.0'
+    # host_ip = "10.30.148.95"
     app.run(host=host_ip, port=5000)
 
 if __name__ == '__main__':
