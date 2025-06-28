@@ -11,3 +11,6 @@ pip install -r requirements.txt
 
 4. Khởi động app
 python app.py
+
+5. Build app
+pyinstaller --onefile --noconsole app.py --add-data "configs;configs" --add-data "controllers;controllers" --add-data "models;models" --add-data "services;services" --add-data "routes;routes"
