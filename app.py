@@ -7,7 +7,9 @@ from flask_cors import CORS
 from routes.api import blueprint
 import netifaces as ni
 from configs.CH9120Config import CH9120_COMMANDS
+import logging
 
+logger = logging.getLogger(__name__)
 
 def get_ip():
     interfaces = ni.interfaces()
@@ -22,8 +24,8 @@ def get_ip():
             continue
     return None
 
-# HOST_IP = "10.30.148.95"
-HOST_IP = get_ip()
+HOST_IP = "10.30.148.95"
+# HOST_IP = get_ip()
 API_BASE_URL = f"http://{HOST_IP}:5000/ch9120"
 COMMANDS = CH9120_COMMANDS
 
@@ -57,7 +59,6 @@ def send_command(line, command, duration):
         payload = {"line": line, "mode": command}
         if duration:
             payload["duration"] = int(duration)
-        print(f"[API] Sending to {line} - {command} - {duration}")
 
     try:
         response = requests.post(url, json=payload)
@@ -174,11 +175,21 @@ app.register_blueprint(blueprint, url_prefix="/ch9120")
 
 
 def run_flask():
-    host_ip = get_ip() if get_ip() else '0.0.0.0'
-    # host_ip = "10.30.148.95"
+    # host_ip = get_ip() if get_ip() else '0.0.0.0'
+    host_ip = "10.30.148.95"
     app.run(host=host_ip, port=5000)
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        filename='light-alerm.log', 
+        level=logging.INFO,
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger.info('Started')
+
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
+
     create_ui()
+    logger.info('Turn down')

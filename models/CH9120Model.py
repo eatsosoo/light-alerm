@@ -1,6 +1,8 @@
 import asyncio
 from configs.config import Config
 from services.CH9120Services import CH9120Services
+import logging as logger
+from configs.CH9120Config import CH9120_COMMANDS
 
 class CH9120Model:
     @staticmethod
@@ -85,8 +87,6 @@ class CH9120Model:
             tasks = []            
 
             for device in devices:
-                print(f"[APP] Sending to {device['ip']}:{device['port']} - {device['station_name']}")
-
                 service = CH9120Services(device['ip'], device['port'])
                 task = asyncio.create_task(service.send_command(hex_command, duration))
                 tasks.append(task)
@@ -96,35 +96,37 @@ class CH9120Model:
             success_count = 0
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    print(f"Error with device {devices[i]['ip']}:{devices[i]['port']} - {result}")
+                    logger.info(f"Error with device {devices[i]['ip']}:{devices[i]['port']} - {result}")
                 elif result.get("status") == "success":
                     success_count += 1
-                    print(f"Success: {devices[i]['ip']}:{devices[i]['port']}")
+                    logger.info(f"Success: {devices[i]['station_name']} - {devices[i]['ip']}:{devices[i]['port']}")
                 else:
-                    print(f"Unknown response from {devices[i]['ip']}:{devices[i]['port']} - {result}")
+                    logger.info(f"Unknown response from {devices[i]['ip']}:{devices[i]['port']} - {result}")
 
-            print(f"{success_count}/{len(devices)} devices executed successfully.")
+            logger(f"{success_count}/{len(devices)} devices executed successfully.")
 
             return success_count > 0  
 
         except Exception as e:
-            print(f"send_command_to_all() failed: {e}")
+            logger.info(f"send_command_to_all() failed: {e}")
             return False
     
     @staticmethod
-    async def send_command_by_line(line, hex_command, duration):
+    async def send_command_by_line(line, mode, duration):
+        hex_command = CH9120_COMMANDS[mode]
         devices = CH9120Model.get_by_line(line)
         tasks = []
         for device in devices:
-            # print(f'START SEND COMMAND TO LINE[{device['station_name']}]: {device['ip']}')
             service = CH9120Services(device['ip'], device['port'])
             task = asyncio.create_task(service.send_command(hex_command, duration))
             tasks.append(task)
         
         results = await asyncio.gather(*tasks)
         if all(result['status'] == 'success' for result in results):
+            logger.info(f"[{device['station_name']} - {device['ip']}:{device['port']}]: Success")
             return True
         else:
+            logger.info(f"[{device['station_name']} - {device['ip']}:{device['port']}]: Fail")
             return False
        
             
