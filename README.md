@@ -66,6 +66,11 @@ Lệnh Hex gửi đến thiết bị đèn cảnh báo có định dạng theo c
 | Dữ liệu điều khiển       | `01 01 00 01`            | 4 byte gồm: Flash, Volume, Play Mode, Track (giải thích bên dưới)     |
 | CRC (Checksum)           | `37 FA`                  | CRC-16 Modbus, định dạng little-endian                                |
 
+Để lấy đúng giá trị CRC:
+```bash
+python CRC16.py --f 01 --v 01 --p 00 --t 01
+```
+
 ### 📋 Giải thích dữ liệu điều khiển (`01 01 00 01`):
 
 | Byte | Ý nghĩa             | Giá trị  | Ghi chú                                            |
