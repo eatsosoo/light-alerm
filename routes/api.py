@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request
-from services.CH9120Services import CH9120Services
 from models.CH9120Model import CH9120Model
-from configs.CH9120Config import CH9120_COMMANDS
+from configs.config import Config
 import asyncio
 import threading
+
+CH9120_COMMANDS = Config.get_commands()
 
 blueprint = Blueprint('api', __name__)
 

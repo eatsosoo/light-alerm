@@ -1,10 +1,10 @@
 import asyncio
 from configs.config import Config
 from services.CH9120Services import CH9120Services
-from configs.CH9120Config import CH9120_COMMANDS
 from services.LoggerService import setup_logger
 
 logger = setup_logger()
+CH9120_COMMANDS = Config.get_commands()
 
 class CH9120Model:
     @staticmethod

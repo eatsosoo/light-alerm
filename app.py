@@ -6,30 +6,17 @@ from flask import Flask
 from flask_cors import CORS
 from routes.api import blueprint
 import netifaces as ni
-from configs.CH9120Config import CH9120_COMMANDS
+from configs.config import Config
 import logging
 import os
 from services.LoggerService import setup_logger
 
 logger = setup_logger()
 
-def get_ip():
-    interfaces = ni.interfaces()
-    for interface in interfaces:
-        try:
-            ipv4_info = ni.ifaddresses(interface).get(ni.AF_INET)
-            if ipv4_info:
-                ip_address = ipv4_info[0]['addr']
-                print(f"IP Address: {ip_address}")
-                return ip_address
-        except ValueError:
-            continue
-    return None
 
-HOST_IP = "10.30.148.95"
-# HOST_IP = get_ip()
+HOST_IP = Config.get_host()
 API_BASE_URL = f"http://{HOST_IP}:5000/ch9120"
-COMMANDS = CH9120_COMMANDS
+COMMANDS = Config.get_commands()
 
 def fetch_lines():
     try:
@@ -178,9 +165,7 @@ app.register_blueprint(blueprint, url_prefix="/ch9120")
 
 
 def run_flask():
-    # host_ip = get_ip() if get_ip() else '0.0.0.0'
-    host_ip = "10.30.148.95"
-    app.run(host=host_ip, port=5000)
+    app.run(host=HOST_IP, port=5000)
 
 if __name__ == '__main__':
     os.makedirs("logs", exist_ok=True)

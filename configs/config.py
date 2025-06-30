@@ -1,19 +1,27 @@
 import yaml
 import pyodbc
 import os
+import sys
 
 class Config:
     _config_data = None
 
     @staticmethod
-    def _load_config(yaml_path="configs/config.yaml"):
+    def _load_config():
         if Config._config_data is None:
-            if not os.path.exists(yaml_path):
-                raise FileNotFoundError(f"Không tìm thấy file cấu hình: {yaml_path}")
-            with open(yaml_path, "r", encoding="utf-8") as f:
-                Config._config_data = yaml.safe_load(f)
-        return Config._config_data
+            # ✅ Không dùng sys._MEIPASS — luôn dùng đường dẫn thật của file đang chạy
+            base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
 
+            config_path = os.path.join(base_dir, "config.yaml")
+
+            if not os.path.exists(config_path):
+                raise FileNotFoundError(f"Không tìm thấy file cấu hình: {config_path}")
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                Config._config_data = yaml.safe_load(f)
+
+        return Config._config_data
+    
     @staticmethod
     def get_db_connection():
         config = Config._load_config()
@@ -28,3 +36,16 @@ class Config:
         )
         
         return pyodbc.connect(conn_str)
+    
+    @staticmethod
+    def get_host():
+        config = Config._load_config()
+        host = config.get("HOST_IP", "")
+        return host
+    
+    @staticmethod
+    def get_commands():
+        config = Config._load_config()
+        commands = config.get('CH9120', {}).get('COMMANDS', {})
+        return commands
+

@@ -1,12 +1,12 @@
-import socket
 import asyncio
-from configs.CH9120Config import CH9120_COMMANDS
 import logging
+from configs.config import Config
 
 class CH9120Services:
     def __init__(self, ip, port):
         self.ip = ip
         self.port = port
+        self.commands = Config.get_commands()
 
     async def send_command(self, hex_command, duration):
         try:
@@ -27,7 +27,7 @@ class CH9120Services:
 
             await asyncio.sleep(duration)
 
-            turn_off_command = bytes.fromhex(CH9120_COMMANDS['TURN_OFF'])
+            turn_off_command = bytes.fromhex(self.commands['TURN_OFF'])
             writer.write(turn_off_command)
             await writer.drain()
 
