@@ -20,3 +20,4 @@ with open(config_path, encoding="utf-8") as f:
 CH9120_COMMANDS = config.get('CH9120', {}).get('COMMANDS', {})
 
 
+

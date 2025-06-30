@@ -4,7 +4,6 @@ from models.CH9120Model import CH9120Model
 from configs.CH9120Config import CH9120_COMMANDS
 import asyncio
 import threading
-import logging as logger
 
 blueprint = Blueprint('api', __name__)
 

@@ -1,8 +1,10 @@
 import asyncio
 from configs.config import Config
 from services.CH9120Services import CH9120Services
-import logging
 from configs.CH9120Config import CH9120_COMMANDS
+from services.LoggerService import setup_logger
+
+logger = setup_logger()
 
 class CH9120Model:
     @staticmethod
@@ -86,7 +88,7 @@ class CH9120Model:
             devices = CH9120Model.get_all()
             tasks = []
 
-            logging.info(f"[COMMAND START] Sending command to {len(devices)} device(s)...")
+            logger.info(f"[COMMAND START] Sending command to {len(devices)} device(s)...")
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
@@ -103,21 +105,21 @@ class CH9120Model:
                 identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
 
                 if isinstance(result, Exception):
-                    logging.error(f"[{identity}] Error: {result}")
+                    logger.error(f"[{identity}] Error: {result}")
                     failure_count += 1
                 elif result.get("status") == "success":
-                    logging.info(f"[{identity}] Success")
+                    logger.info(f"[{identity}] Success")
                     success_count += 1
                 else:
-                    logging.warning(f"[{identity}] Unknown response: {result}")
+                    logger.warning(f"[{identity}] Unknown response: {result}")
                     failure_count += 1
 
-            logging.info(f"[COMMAND SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
+            logger.info(f"[COMMAND SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
 
             return success_count > 0
 
         except Exception as e:
-            logging.exception(f"[COMMAND ERROR] send_command_to_all() failed: {e}")
+            logger.exception(f"[COMMAND ERROR] send_command_to_all() failed: {e}")
             return False
 
     
@@ -128,7 +130,7 @@ class CH9120Model:
             devices = CH9120Model.get_by_line(line)
             tasks = []
 
-            logging.info(f"[LINE {line}] Sending command '{mode}' to {len(devices)} device(s)...")
+            logger.info(f"[LINE {line}] Sending command '{mode}' to {len(devices)} device(s)...")
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
@@ -145,21 +147,21 @@ class CH9120Model:
                 identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
 
                 if isinstance(result, Exception):
-                    logging.error(f"[{identity}] Exception: {result}")
+                    logger.error(f"[{identity}] Exception: {result}")
                     failure_count += 1
                 elif result.get("status") == "success":
-                    logging.info(f"[{identity}] Success")
+                    logger.info(f"[{identity}] Success")
                     success_count += 1
                 else:
-                    logging.warning(f"[{identity}] Unexpected result: {result}")
+                    logger.warning(f"[{identity}] Unexpected result: {result}")
                     failure_count += 1
 
-            logging.info(f"[LINE {line} SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
+            logger.info(f"[LINE {line} SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
 
             return success_count == len(devices)
 
         except Exception as e:
-            logging.exception(f"[LINE {line} ERROR] send_command_by_line() failed: {e}")
+            logger.exception(f"[LINE {line} ERROR] send_command_by_line() failed: {e}")
             return False
 
        

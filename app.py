@@ -8,8 +8,10 @@ from routes.api import blueprint
 import netifaces as ni
 from configs.CH9120Config import CH9120_COMMANDS
 import logging
+import os
+from services.LoggerService import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
 def get_ip():
     interfaces = ni.interfaces()
@@ -181,13 +183,9 @@ def run_flask():
     app.run(host=host_ip, port=5000)
 
 if __name__ == '__main__':
+    os.makedirs("logs", exist_ok=True)
+
     logging.getLogger('werkzeug').disabled = True
-    logging.basicConfig(
-        filename='light-alerm.log', 
-        level=logging.INFO,
-        format='[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
     logger.info('Started')
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)

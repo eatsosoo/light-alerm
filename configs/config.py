@@ -1,19 +1,30 @@
+import yaml
 import pyodbc
+import os
 
 class Config:
-    SQL_SERVER = '10.30.0.18,1433'
-    SQL_DATABASE = 'DV_DATA_LAKE'
-    SQL_USER = 'sa'
-    SQL_PASSWORD = 'greenland@VN'
-    SQL_DRIVER = '{ODBC Driver 17 for SQL Server}'
-    
+    _config_data = None
+
+    @staticmethod
+    def _load_config(yaml_path="configs/config.yaml"):
+        if Config._config_data is None:
+            if not os.path.exists(yaml_path):
+                raise FileNotFoundError(f"Không tìm thấy file cấu hình: {yaml_path}")
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                Config._config_data = yaml.safe_load(f)
+        return Config._config_data
+
     @staticmethod
     def get_db_connection():
-        conn = pyodbc.connect(
-            f'DRIVER={Config.SQL_DRIVER};'
-            f'SERVER={Config.SQL_SERVER};'
-            f'DATABASE={Config.SQL_DATABASE};'
-            f'UID={Config.SQL_USER};'
-            f'PWD={Config.SQL_PASSWORD}'
+        config = Config._load_config()
+        db = config.get("DATABASE", {})
+        
+        conn_str = (
+            f"DRIVER={db.get('SQL_DRIVER')};"
+            f"SERVER={db.get('SQL_SERVER')};"
+            f"DATABASE={db.get('SQL_DATABASE')};"
+            f"UID={db.get('SQL_USER')};"
+            f"PWD={db.get('SQL_PASSWORD')}"
         )
-        return conn
+        
+        return pyodbc.connect(conn_str)
