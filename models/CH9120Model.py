@@ -1,7 +1,7 @@
 import asyncio
 from configs.config import Config
 from services.CH9120Services import CH9120Services
-import logging as logger
+import logging
 from configs.CH9120Config import CH9120_COMMANDS
 
 class CH9120Model:
@@ -84,7 +84,9 @@ class CH9120Model:
     async def send_command_to_all(hex_command, duration):
         try:
             devices = CH9120Model.get_all()
-            tasks = []            
+            tasks = []
+
+            logging.info(f"[COMMAND START] Sending command to {len(devices)} device(s)...")
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
@@ -94,39 +96,71 @@ class CH9120Model:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             success_count = 0
+            failure_count = 0
+
             for i, result in enumerate(results):
+                dev = devices[i]
+                identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
+
                 if isinstance(result, Exception):
-                    logger.info(f"Error with device {devices[i]['ip']}:{devices[i]['port']} - {result}")
+                    logging.error(f"[{identity}] Error: {result}")
+                    failure_count += 1
                 elif result.get("status") == "success":
+                    logging.info(f"[{identity}] Success")
                     success_count += 1
-                    logger.info(f"Success: {devices[i]['station_name']} - {devices[i]['ip']}:{devices[i]['port']}")
                 else:
-                    logger.info(f"Unknown response from {devices[i]['ip']}:{devices[i]['port']} - {result}")
+                    logging.warning(f"[{identity}] Unknown response: {result}")
+                    failure_count += 1
 
-            logger(f"{success_count}/{len(devices)} devices executed successfully.")
+            logging.info(f"[COMMAND SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
 
-            return success_count > 0  
+            return success_count > 0
 
         except Exception as e:
-            logger.info(f"send_command_to_all() failed: {e}")
+            logging.exception(f"[COMMAND ERROR] send_command_to_all() failed: {e}")
             return False
+
     
     @staticmethod
     async def send_command_by_line(line, mode, duration):
-        hex_command = CH9120_COMMANDS[mode]
-        devices = CH9120Model.get_by_line(line)
-        tasks = []
-        for device in devices:
-            service = CH9120Services(device['ip'], device['port'])
-            task = asyncio.create_task(service.send_command(hex_command, duration))
-            tasks.append(task)
-        
-        results = await asyncio.gather(*tasks)
-        if all(result['status'] == 'success' for result in results):
-            logger.info(f"[{device['station_name']} - {device['ip']}:{device['port']}]: Success")
-            return True
-        else:
-            logger.info(f"[{device['station_name']} - {device['ip']}:{device['port']}]: Fail")
+        try:
+            hex_command = CH9120_COMMANDS[mode]
+            devices = CH9120Model.get_by_line(line)
+            tasks = []
+
+            logging.info(f"[LINE {line}] Sending command '{mode}' to {len(devices)} device(s)...")
+
+            for device in devices:
+                service = CH9120Services(device['ip'], device['port'])
+                task = asyncio.create_task(service.send_command(hex_command, duration))
+                tasks.append(task)
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            success_count = 0
+            failure_count = 0
+
+            for i, result in enumerate(results):
+                dev = devices[i]
+                identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
+
+                if isinstance(result, Exception):
+                    logging.error(f"[{identity}] Exception: {result}")
+                    failure_count += 1
+                elif result.get("status") == "success":
+                    logging.info(f"[{identity}] Success")
+                    success_count += 1
+                else:
+                    logging.warning(f"[{identity}] Unexpected result: {result}")
+                    failure_count += 1
+
+            logging.info(f"[LINE {line} SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
+
+            return success_count == len(devices)
+
+        except Exception as e:
+            logging.exception(f"[LINE {line} ERROR] send_command_by_line() failed: {e}")
             return False
+
        
             

@@ -47,6 +47,7 @@ def fetch_devices_by_line(line):
     except requests.RequestException as e:
         messagebox.showerror("Error", f"Failed to fetch devices: {e}")
         return []
+
 def send_command(line, command, duration):
     url = f"{API_BASE_URL}"
     if line == "All":
@@ -180,6 +181,7 @@ def run_flask():
     app.run(host=host_ip, port=5000)
 
 if __name__ == '__main__':
+    logging.getLogger('werkzeug').disabled = True
     logging.basicConfig(
         filename='light-alerm.log', 
         level=logging.INFO,

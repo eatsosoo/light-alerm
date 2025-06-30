@@ -1,6 +1,7 @@
 import socket
 import asyncio
 from configs.CH9120Config import CH9120_COMMANDS
+import logging
 
 class CH9120Services:
     def __init__(self, ip, port):
@@ -36,6 +37,7 @@ class CH9120Services:
             return {"status": "success", "response": response.hex()}
 
         except Exception as e:
+            logging.error(f'Send command: {str(e)}')
             return {"status": "error", "response": str(e)}
 
 

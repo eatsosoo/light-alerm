@@ -64,12 +64,12 @@ Lệnh Hex gửi đến thiết bị đèn cảnh báo có định dạng theo c
 
 ### 📋 Giải thích dữ liệu điều khiển (`01 01 00 01`):
 
-| Byte | Ý nghĩa             | Giá trị  | Ghi chú                                  |
-|------|---------------------|----------|------------------------------------------|
-| 1    | Flash mode          | `01`     | Chế độ nhấp nháy (1 = nhanh nhất)        |
-| 2    | Âm lượng            | `01`     | Mức âm lượng (01 = nhỏ nhất, 08 = max)   |
-| 3    | Play mode           | `00`     | `00` = phát lặp, `01-16` = số lần phát   |
-| 4    | Track (bài âm thanh)| `01`     | Chọn bài số 1 trong bộ nhớ thiết bị      |
+| Byte | Ý nghĩa             | Giá trị  | Ghi chú                                            |
+|------|---------------------|----------|----------------------------------------------------|
+| 1    | Flash mode          | `01`     | Chế độ nhấp nháy (1 = nhanh nhất)                  |
+| 2    | Âm lượng            | `01`     | Mức âm lượng (01 = nhỏ nhất, 08 = max, 00 = tắt)   |
+| 3    | Play mode           | `00`     | `00` = phát lặp, `01-16` = số lần phát             |
+| 4    | Track (bài âm thanh)| `01`     | Chọn bài số 1 trong bộ nhớ thiết bị                |
 
 ---
 
