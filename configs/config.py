@@ -9,9 +9,8 @@ class Config:
     @staticmethod
     def _load_config():
         if Config._config_data is None:
-            # ✅ Không dùng sys._MEIPASS — luôn dùng đường dẫn thật của file đang chạy
-            base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
-
+            # ✅ Giả định bạn luôn chạy từ thư mục project root
+            base_dir = os.getcwd()
             config_path = os.path.join(base_dir, "config.yaml")
 
             if not os.path.exists(config_path):
