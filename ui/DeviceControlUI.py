@@ -97,15 +97,54 @@ class DeviceControlUI:
                             background="#1e1e1e",
                             fieldbackground="#1e1e1e",
                             foreground="white",
-                            borderwidth=0)
+                            borderwidth=1,
+                            relief="solid",  # để hiển thị đường viền rõ hơn
+                            lightcolor="#2b2b2b",
+                            darkcolor="#2b2b2b",
+                            bordercolor="#2b2b2b")
         self.style.configure("Treeview.Heading",
                             font=("Arial", 12, "bold"),
                             borderwidth=0,
+                            relief="flat",
                             background="#333333",
                             foreground="white")
         self.style.map("Treeview",
                       background=[("selected", "#444444")],
                       foreground=[("selected", "white")])
+        
+        # Notebook background (tab + content)
+        self.style.configure("TNotebook", background="#000000", borderwidth=0)
+        self.style.configure("TNotebook.Tab",
+            background="#1a1a1a",
+            foreground="white",
+            padding=[10, 5],
+            borderwidth=0,            # Xoá viền trắng
+            lightcolor="#000000",     # Màu viền sáng
+            bordercolor="#000000",    # Màu viền chính
+            darkcolor="#000000",      # Màu viền tối
+            focuscolor="#000000",     # Màu viền khi focus
+            relief="flat"             # Kiểu hiển thị không nhô
+        )
+        self.style.map("TNotebook.Tab", background=[("selected", "#2b2b2b")])
+
+        # Frame styling (applies to ttk.Frame)
+        self.style.configure("TFrame", background="#000000")
+
+        # Combobox styling
+        self.style.configure("TCombobox",
+            fieldbackground="#1a1a1a",
+            background="#1a1a1a",
+            foreground="white",
+            bordercolor="#2b2b2b",
+            lightcolor="#2b2b2b",
+            darkcolor="#2b2b2b",
+            borderwidth=1,
+            relief="flat"
+        )
+        self.style.map("TCombobox",
+                    fieldbackground=[("readonly", "#1a1a1a")],
+                    background=[("readonly", "#1a1a1a")],
+                    foreground=[("readonly", "white")])
     
     def create_filter_section(self, parent):
         filter = tk.Frame(parent, bg="#1a1a1a")
