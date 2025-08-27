@@ -75,7 +75,7 @@ python CRC16.py --f 01 --v 01 --p 00 --t 01
 
 | Byte | Ý nghĩa             | Giá trị  | Ghi chú                                            |
 |------|---------------------|----------|----------------------------------------------------|
-| 1    | Flash mode          | `01`     | Chế độ nhấp nháy (01 -> 05)                  |
+| 1    | Flash mode          | `01`     | Chế độ nhấp nháy (01 -> 05)                        |
 | 2    | Âm lượng            | `01`     | Mức âm lượng (01 = nhỏ nhất, 08 = max, 00 = tắt)   |
 | 3    | Play mode           | `00`     | `00` = phát lặp, `01-16` = số lần phát             |
 | 4    | Track (bài âm thanh)| `01`     | Chọn bài số 1 trong bộ nhớ thiết bị                |

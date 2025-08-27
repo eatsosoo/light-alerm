@@ -43,6 +43,12 @@ class Config:
         return host
     
     @staticmethod
+    def get_port():
+        config = Config._load_config()
+        host = config.get("PORT", "5000")
+        return host
+    
+    @staticmethod
     def get_commands():
         config = Config._load_config()
         commands = config.get('CH9120', {}).get('COMMANDS', {})

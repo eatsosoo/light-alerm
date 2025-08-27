@@ -4,8 +4,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class NetworkService:
-    def __init__(self, ip, timeout=5):
-        self.base_url = f"http://{ip}:5000/ch9120"
+    def __init__(self, ip, port, timeout=5):
+        self.base_url = f"http://{ip}:{port}/ch9120"
         self.timeout = timeout
 
     def fetch_lines(self):
@@ -18,10 +18,10 @@ class NetworkService:
                 return [item["line"] for item in data.get("lines", [])]
             except ValueError:
                 logger.error("Invalid JSON in fetch_lines")
-                return [], "Invalid JSON response."
+                return []   # luôn trả list
         except requests.RequestException as e:
             logger.error(f"fetch_lines failed: {e}")
-            return [], str(e)
+            return [] 
 
     def fetch_devices_by_line(self, line):
         url = (
@@ -40,7 +40,7 @@ class NetworkService:
                 return [], "Invalid JSON response."
         except requests.RequestException as e:
             logger.error(f"fetch_devices_by_line failed: {e}")
-            return [], str(e)
+            return []
 
     def send_command(self, line, command, duration=None):
         if line == "All":

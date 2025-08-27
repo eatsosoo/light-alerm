@@ -5,9 +5,10 @@ import os
 from datetime import datetime
 
 class DeviceControlUI:
-    def __init__(self, root, host_ip, commands):
+    def __init__(self, root, host_ip, port, commands):
         self.root = root
         self.host_ip = host_ip
+        self.port = port
         self.commands = commands
         self.selected_line = tk.StringVar(value="All")
         self.setup_ui()
@@ -153,7 +154,7 @@ class DeviceControlUI:
         tk.Label(filter, text="Filter by Line:", fg="white", bg="#1a1a1a", 
                 font=("Arial", 10)).pack(side="left", padx=5)
 
-        lines = NetworkService(self.host_ip).fetch_lines()
+        lines = list(NetworkService(self.host_ip, self.port).fetch_lines())
         self.line_filter = ttk.Combobox(filter, textvariable=self.selected_line, 
                                        values=["All"] + lines, state="readonly", width=14)
         self.line_filter.pack(side="left", padx=5)
@@ -199,7 +200,7 @@ class DeviceControlUI:
     def update_device_list(self):
         self.tree.delete(*self.tree.get_children())
         selected = self.selected_line.get()
-        devices = NetworkService(self.host_ip).fetch_devices_by_line(selected)
+        devices = NetworkService(self.host_ip, self.port).fetch_devices_by_line(selected)
         for idx, device in enumerate(devices):
             tag = "even" if idx % 2 == 0 else "odd"
             self.tree.insert("", "end", 
@@ -209,4 +210,4 @@ class DeviceControlUI:
     def send_to_selected_line(self, command):
         line = self.selected_line.get()
         duration = self.duration_entry.get().strip()
-        NetworkService(self.host_ip).send_command(line, command, duration)
+        NetworkService(self.host_ip, self.port).send_command(line, command, duration)

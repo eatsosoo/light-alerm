@@ -3,6 +3,9 @@ from models.CH9120Model import CH9120Model
 from configs.config import Config
 import asyncio
 import threading
+from services.LoggerService import setup_logger
+
+logger = setup_logger()
 
 CH9120_COMMANDS = Config.get_commands()
 
@@ -98,8 +101,15 @@ def get_devices_by_line(line):
 
 @blueprint.route('/get-all-devices', methods=['GET'])
 def get_all_devices():
-    devices = CH9120Model.get_all()
-    return jsonify({"status": "success", "devices": devices})
+    try:
+        devices = CH9120Model.get_all()
+        return jsonify({"status": "success", "devices": devices})
+    except Exception as e:
+        logger.exception(f"get_all_devices failed: {e}")  # log chi tiết kèm stacktrace
+        return jsonify({
+            "status": "error",
+            "message": "Database error or internal server error"
+        }), 500
 
 @blueprint.route('/get-all-lines', methods=['GET'])
 def get_all_lines():
