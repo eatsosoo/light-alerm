@@ -154,18 +154,39 @@ class DeviceControlUI:
         tk.Label(filter, text="Filter by Line:", fg="white", bg="#1a1a1a", 
                 font=("Arial", 10)).pack(side="left", padx=5)
 
-        lines = list(NetworkService(self.host_ip, self.port).fetch_lines())
-        self.line_filter = ttk.Combobox(filter, textvariable=self.selected_line, 
-                                       values=["All"] + lines, state="readonly", width=14)
+        # Lưu NetworkService vào biến để tái sử dụng
+        self.network_service = NetworkService(self.host_ip, self.port)
+
+        # Khởi tạo combobox
+        lines = list(self.network_service.fetch_lines())
+        self.line_filter = ttk.Combobox(
+            filter, textvariable=self.selected_line, 
+            values=["All"] + lines, state="readonly", width=14
+        )
         self.line_filter.pack(side="left", padx=5)
         self.line_filter.bind("<<ComboboxSelected>>", lambda event: self.update_device_list())
+
+        # Nút Refetch Lines
+        refetch_btn = tk.Button(
+            filter,
+            text="Refetch Lines",
+            command=self.refetch_lines,
+            bg="#333333",
+            fg="white",
+            relief="flat",
+            padx=10,
+            pady=5
+        )
+        refetch_btn.pack(side="left", padx=10)
 
         tk.Label(filter, text="Duration (optional):", fg="white", bg="#1a1a1a", 
                 font=("Arial", 10)).pack(side="left", padx=5)
 
-        self.duration_entry = tk.Entry(filter, width=6, bg="#2b2b2b", fg="white", 
-                                     insertbackground="white", relief="flat", 
-                                     highlightbackground="#444", highlightthickness=1, bd=4)
+        self.duration_entry = tk.Entry(
+            filter, width=6, bg="#2b2b2b", fg="white", 
+            insertbackground="white", relief="flat", 
+            highlightbackground="#444", highlightthickness=1, bd=4
+        )
         self.duration_entry.pack(side="left", padx=5)
     
     def create_treeview(self, parent):
@@ -211,3 +232,17 @@ class DeviceControlUI:
         line = self.selected_line.get()
         duration = self.duration_entry.get().strip()
         NetworkService(self.host_ip, self.port).send_command(line, command, duration)
+
+    def refetch_lines(self):
+        """Làm mới danh sách lines và treeview"""
+        # Lấy lại danh sách lines từ NetworkService
+        new_lines = list(self.network_service.fetch_lines())
+        
+        # Cập nhật lại combobox Line filter
+        self.line_filter["values"] = ["All"] + new_lines
+        
+        # Reset về 'All' (có thể giữ nguyên line cũ nếu bạn muốn)
+        self.selected_line.set("All")
+        
+        # Làm mới treeview với line vừa chọn
+        self.update_device_list()

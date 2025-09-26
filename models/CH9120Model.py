@@ -70,6 +70,17 @@ class CH9120Model:
         devices = cursor.fetchall()
         result = [dict(zip([column[0] for column in cursor.description], device)) for device in devices]
         return result
+    
+    @staticmethod
+    def get_device_office():
+        conn = Config.get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT * FROM dbo.dv_warning_light_devices WHERE line = 'OFFICE'"
+        cursor.execute(query)
+        devices = cursor.fetchall()
+        conn.close()
+        result = [dict(zip([column[0] for column in cursor.description], device)) for device in devices]
+        return result
 
     @staticmethod
     def get_all():
@@ -163,6 +174,50 @@ class CH9120Model:
         except Exception as e:
             logger.exception(f"[LINE {line} ERROR] send_command_by_line() failed: {e}")
             return False
+        
+    @staticmethod
+    async def send_command_device_office(line, mode, duration):
+        try:
+            hex_command1 = CH9120_COMMANDS[mode]
+            hex_command2 = CH9120_COMMANDS['OFFICE']
+
+            device = CH9120Model.get_by_line(line)
+            office_devices = CH9120Model.get_device_office()
+
+            targets = []
+            if device:
+                targets.append((device[0], hex_command1))
+            for off_dev in office_devices:
+                targets.append((off_dev, hex_command2))
+
+            logger.info(f"[DEVICE {line} & OFFICE] Sending command '{mode}' to device and {len(office_devices)} office device(s)...")
+
+            tasks = [
+            CH9120Services(dev['ip'], dev['port']).send_command(cmd, duration)
+                for dev, cmd in targets
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            summary = {"success": 0, "failure": 0, "devices": []}
+            for dev, result in zip([t[0] for t in targets], results):
+                status = "success" if not isinstance(result, Exception) and isinstance(result, dict) and result.get("status") == "success" else "failure"
+                summary[status] += 1
+                summary["devices"].append({
+                    "station": dev['station_name'],
+                    "ip": dev['ip'],
+                    "port": dev['port'],
+                    "status": status,
+                    "error": str(result) if isinstance(result, Exception) else None
+                })
+
+            logger.info(f"[SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
+
+            return summary
+
+        except Exception as e:
+            logger.exception(f"[DEVICE {line} & OFFICE ERROR] send_command_device_office() failed: {e}")
+            return {"success": 0, "failure": 0, "devices": [], "error": str(e)}
 
        
             
