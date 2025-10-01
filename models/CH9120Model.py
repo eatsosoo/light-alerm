@@ -212,13 +212,69 @@ class CH9120Model:
                     "error": str(result) if isinstance(result, Exception) else None
                 })
 
-            logger.info(f"[SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
+                if status == "success":
+                    logger.info(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> SUCCESS")
+                else:
+                    logger.error(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> FAILURE")
 
+            logger.info(f"[SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
             return summary
 
         except Exception as e:
             logger.exception(f"[DEVICE {line} & OFFICE ERROR] send_command_device_office() failed: {e}")
             return {"success": 0, "failure": 0, "devices": [], "error": str(e)}
+        
+    @staticmethod
+    async def turn_off_device_and_office(line):
+        try:
+            hex_command = CH9120_COMMANDS['TURN_OFF']
+
+            # Lấy device theo line
+            device = CH9120Model.get_by_line(line)
+            # Lấy office devices
+            office_devices = CH9120Model.get_device_office()
+
+            targets = []
+            if device:
+                targets.append(device[0])  # chỉ lấy thiết bị đầu tiên theo line
+            targets.extend(office_devices)
+
+            logger.info(f"[TURN_OFF] Sending TURN_OFF to {len(targets)} device(s) (line={line} + office)...")
+
+            tasks = [
+                CH9120Services(dev['ip'], dev['port']).send_command(hex_command, 0)
+                for dev in targets
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            summary = {"success": 0, "failure": 0, "devices": []}
+            for dev, result in zip(targets, results):
+                status = "success" if not isinstance(result, Exception) and isinstance(result, dict) and result.get("status") == "success" else "failure"
+                summary[status] += 1
+                device_log = {
+                    "station": dev['station_name'],
+                    "ip": dev['ip'],
+                    "port": dev['port'],
+                    "status": status,
+                    "error": str(result) if isinstance(result, Exception) else None
+                }
+                summary["devices"].append(device_log)
+
+                if status == "success":
+                    logger.info(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> TURN_OFF SUCCESS")
+                else:
+                    logger.error(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> TURN_OFF FAILURE ({device_log['error']})")
+
+            logger.info(f"[TURN_OFF SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
+            return summary
+
+        except Exception as e:
+            logger.exception(f"[TURN_OFF ERROR] turn_off_device_and_office() failed: {e}")
+            return {"success": 0, "failure": 0, "devices": [], "error": str(e)}
+
+
+
 
        
             

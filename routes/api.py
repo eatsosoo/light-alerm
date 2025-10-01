@@ -65,6 +65,19 @@ async def send_to_device_and_office():
     threading.Thread(target=run_command).start();
     return jsonify({"status": "success", "message": "Command is being sent to device and office."})
 
+@blueprint.route('/send-command/turn-off-all/<line>', methods=['GET'])
+async def turn_off_all_devices(line):
+    def run_command():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(CH9120Model.turn_off_device_and_office(line))
+        finally:
+            loop.close()
+
+    threading.Thread(target=run_command).start()
+    return jsonify({"status": "success", "message": "TURN_OFF command is being sent to device and office."})
+
 @blueprint.route('/create_device', methods=['POST'])
 def create_device():
     user_code_created = request.json.get('user_code_created')
