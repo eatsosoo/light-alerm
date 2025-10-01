@@ -1,0 +1,26 @@
+python语言：
+def crc16_modbus(data_hex):
+    """
+    Calculate the CRC16 MODBUS checksum of *data_hex*.
+    
+    :param data_hex: The input data as a hexadecimal string
+    :return: The calculated CRC as a hexadecimal string
+    """
+    crc = 0xFFFF
+    poly = 0xA001  # 0x8005 reverse polynomial
+    data = bytearray.fromhex(data_hex)
+
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if (crc & 0x0001):
+                crc = (crc >> 1) ^ poly
+            else:
+                crc >>= 1
+
+    return format(crc, '04X')
+
+# Example usage:
+data = '01 10 00 1A 00 01 00'.replace(' ','')
+crc_value = crc16_modbus(data)
+print(f'The CRC value is: {crc_value}')
