@@ -65,8 +65,8 @@ class CH9120Model:
     def get_by_line(line):
         conn = Config.get_db_connection()
         cursor = conn.cursor()
-        query = "SELECT * FROM dbo.dv_warning_light_devices WHERE line = ?"
-        cursor.execute(query, (line,))
+        query = "SELECT * FROM dbo.dv_warning_light_devices WHERE line LIKE ?"
+        cursor.execute(query, (f"%{line}%",))
         devices = cursor.fetchall()
         result = [dict(zip([column[0] for column in cursor.description], device)) for device in devices]
         return result

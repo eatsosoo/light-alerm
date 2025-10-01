@@ -158,7 +158,9 @@ class DeviceControlUI:
         self.network_service = NetworkService(self.host_ip, self.port)
 
         # Khởi tạo combobox
-        lines = list(self.network_service.fetch_lines())
+        self.records = list(self.network_service.fetch_devices_by_line('All'))  # lưu vào self.records
+        lines = [item["line"] for item in self.records]
+
         self.line_filter = ttk.Combobox(
             filter, textvariable=self.selected_line, 
             values=["All"] + lines, state="readonly", width=14
@@ -179,6 +181,20 @@ class DeviceControlUI:
         )
         refetch_btn.pack(side="left", padx=10)
 
+        # --- Ô tìm kiếm ---
+        tk.Label(filter, text="Search:", fg="white", bg="#1a1a1a",
+                font=("Arial", 10)).pack(side="left", padx=5)
+
+        self.search_var = tk.StringVar()
+        search_entry = tk.Entry(
+            filter, textvariable=self.search_var,
+            width=12, bg="#2b2b2b", fg="white",
+            insertbackground="white", relief="flat",
+            highlightbackground="#444", highlightthickness=1, bd=4
+        )
+        search_entry.pack(side="left", padx=5)
+        search_entry.bind("<KeyRelease>", lambda event: self.apply_search_filter())
+
         tk.Label(filter, text="Duration (optional):", fg="white", bg="#1a1a1a", 
                 font=("Arial", 10)).pack(side="left", padx=5)
 
@@ -188,6 +204,15 @@ class DeviceControlUI:
             highlightbackground="#444", highlightthickness=1, bd=4
         )
         self.duration_entry.pack(side="left", padx=5)
+
+    def apply_search_filter(self):
+        keyword = self.search_var.get().strip().lower()
+        if keyword:
+            filtered = [item["line"] for item in self.records if keyword in item["line"].lower()]
+        else:
+            filtered = [item["line"] for item in self.records]
+        print(f'Filtered lines: {filtered}')  # Debug print
+        self.line_filter["values"] = ["All"] + filtered
     
     def create_treeview(self, parent):
         columns = ("IP", "Port", "Line", "Station")
@@ -236,7 +261,8 @@ class DeviceControlUI:
     def refetch_lines(self):
         """Làm mới danh sách lines và treeview"""
         # Lấy lại danh sách lines từ NetworkService
-        new_lines = list(self.network_service.fetch_lines())
+        new_lines = list(self.network_service.fetch_devices_by_line('All'))
+        new_lines = list({item["line"] for item in new_lines})
         
         # Cập nhật lại combobox Line filter
         self.line_filter["values"] = ["All"] + new_lines

@@ -53,4 +53,10 @@ class Config:
         config = Config._load_config()
         commands = config.get('CH9120', {}).get('COMMANDS', {})
         return commands
+    
+    @staticmethod
+    def get_ssl():
+        config = Config._load_config()
+        cert = config.get('SSL', {})
+        return cert
 
