@@ -140,12 +140,13 @@ class CH9120Model:
             hex_command = CH9120_COMMANDS[mode]
             devices = CH9120Model.get_by_line(line)
             tasks = []
+            timeDuration = int(duration) if duration else 5
 
             logger.info(f"[LINE {line}] Sending command '{mode}' to {len(devices)} device(s)...")
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
-                task = asyncio.create_task(service.send_command(hex_command, duration))
+                task = asyncio.create_task(service.send_command(hex_command, timeDuration))
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks, return_exceptions=True)

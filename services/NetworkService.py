@@ -2,6 +2,8 @@ import requests
 import logging
 from configs.config import Config
 from models.CH9120Model import CH9120Model
+import asyncio
+import threading
 
 logger = logging.getLogger(__name__)
 SSL = Config.get_ssl()
@@ -47,3 +49,16 @@ class NetworkService:
                 msg = str(e)
             logger.error(f"send_command failed: {msg}")
             return False, msg
+        
+    def send_alert_from_app(self, line, command, duration=None):
+        def run_command():
+            try:
+                asyncio.run(CH9120Model.send_command_by_line(line, command, duration))
+            except Exception as e:
+                logger.error(f"send_alert_from_app failed: {e}")
+        
+        try:
+            thread = threading.Thread(target=run_command)
+            thread.start()
+        except Exception as e:
+            logger.error(f"Failed to start thread in send_alert_from_app: {e}")

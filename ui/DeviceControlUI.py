@@ -256,7 +256,7 @@ class DeviceControlUI:
     def send_to_selected_line(self, command):
         line = self.selected_line.get()
         duration = self.duration_entry.get().strip()
-        NetworkService(self.host_ip, self.port).send_command(line, command, duration)
+        NetworkService(self.host_ip, self.port).send_alert_from_app(line, command, duration)
 
     def refetch_lines(self):
         """Làm mới danh sách lines và treeview"""
