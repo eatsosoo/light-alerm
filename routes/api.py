@@ -49,7 +49,7 @@ async def send_command_to_line():
 @blueprint.route('/send-command/device-office', methods=['POST'])
 async def send_to_device_and_office():
     data = request.get_json()
-    device_id = data.get('line')
+    device_station = data.get('line')
     mode = data.get('mode')
     duration = data.get('duration', 5)
 
@@ -59,7 +59,7 @@ async def send_to_device_and_office():
     def run_command():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(CH9120Model.send_command_device_office(device_id, mode, duration))
+        loop.run_until_complete(CH9120Model.send_command_device_office(device_station, mode, duration))
         loop.close()
     
     threading.Thread(target=run_command).start();
@@ -71,9 +71,14 @@ async def turn_off_all_devices(line):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(CH9120Model.turn_off_device_and_office(line))
+            logger.info(f"[TURN_OFF_THREAD] Starting turn_off_device_and_office for line={line}")
+            result = loop.run_until_complete(CH9120Model.turn_off_device_and_office(line))
+            # logger.info(f"[TURN_OFF_THREAD] Completed with result: {result}")
+        except Exception as e:
+            logger.exception(f"[TURN_OFF_THREAD] Exception while running turn_off_device_and_office: {e}")
         finally:
             loop.close()
+            logger.info(f"[TURN_OFF_THREAD] Event loop closed for line={line}")
 
     threading.Thread(target=run_command).start()
     return jsonify({"status": "success", "message": "TURN_OFF command is being sent to device and office."})

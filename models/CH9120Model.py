@@ -182,6 +182,9 @@ class CH9120Model:
             hex_command1 = CH9120_COMMANDS[mode]
             hex_command2 = CH9120_COMMANDS['OFFICE']
 
+            if mode == 'TURN_OFF':
+                hex_command2 = CH9120_COMMANDS['TURN_OFF']
+
             device = CH9120Model.get_by_line(line)
             office_devices = CH9120Model.get_device_office()
 
