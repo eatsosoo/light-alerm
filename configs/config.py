@@ -2,6 +2,9 @@ import yaml
 import pyodbc
 import os
 import sys
+from services.LoggerService import setup_logger
+
+logger = setup_logger()
 
 class Config:
     _config_data = None
@@ -22,7 +25,7 @@ class Config:
         return Config._config_data
     
     @staticmethod
-    def get_db_connection():
+    def get_db_connection():        
         config = Config._load_config()
         db = config.get("DATABASE", {})
         
@@ -34,7 +37,13 @@ class Config:
             f"PWD={db.get('SQL_PASSWORD')}"
         )
         
-        return pyodbc.connect(conn_str)
+        try:
+            connection = pyodbc.connect(conn_str)
+            logger.info("Database connection successful.")
+            return connection
+        except pyodbc.Error as e:
+            logger.error(f"Database connection failed: {e}")
+            raise
     
     @staticmethod
     def get_host():
@@ -53,4 +62,10 @@ class Config:
         config = Config._load_config()
         commands = config.get('CH9120', {}).get('COMMANDS', {})
         return commands
+    
+    @staticmethod
+    def get_ssl():
+        config = Config._load_config()
+        cert = config.get('SSL', {})
+        return cert
 

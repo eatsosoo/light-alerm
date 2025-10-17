@@ -1,44 +1,24 @@
 import requests
 import logging
+from configs.config import Config
+from models.CH9120Model import CH9120Model
+import asyncio
+import threading
 
 logger = logging.getLogger(__name__)
-
+SSL = Config.get_ssl()
 class NetworkService:
     def __init__(self, ip, port, timeout=5):
-        self.base_url = f"http://{ip}:{port}/ch9120"
+        scheme = "https" if SSL["ENABLED"] else "http"
+        self.base_url = f"{scheme}://{ip}:{port}/ch9120"
         self.timeout = timeout
 
-    def fetch_lines(self):
-        url = f"{self.base_url}/get-all-lines"
-        try:
-            response = requests.get(url, timeout=self.timeout)
-            response.raise_for_status()
-            try:
-                data = response.json()
-                return [item["line"] for item in data.get("lines", [])]
-            except ValueError:
-                logger.error("Invalid JSON in fetch_lines")
-                return []   # luôn trả list
-        except requests.RequestException as e:
-            logger.error(f"fetch_lines failed: {e}")
-            return [] 
-
     def fetch_devices_by_line(self, line):
-        url = (
-            f"{self.base_url}/get-all-devices"
-            if line == "All"
-            else f"{self.base_url}/get_devices_by_line/{line}"
-        )
         try:
-            response = requests.get(url, timeout=self.timeout)
-            response.raise_for_status()
-            try:
-                data = response.json()
-                return data.get("devices", [])
-            except ValueError:
-                logger.error("Invalid JSON in fetch_devices_by_line")
-                return [], "Invalid JSON response."
-        except requests.RequestException as e:
+            devices = CH9120Model.get_by_line('' if line == "All" else line)
+            logger.info("Fetched %s devices for line %s", len(devices), line)
+            return devices
+        except Exception as e:
             logger.error(f"fetch_devices_by_line failed: {e}")
             return []
 
@@ -69,3 +49,16 @@ class NetworkService:
                 msg = str(e)
             logger.error(f"send_command failed: {msg}")
             return False, msg
+        
+    def send_alert_from_app(self, line, command, duration=None):
+        def run_command():
+            try:
+                asyncio.run(CH9120Model.send_command_by_line(line, command, duration))
+            except Exception as e:
+                logger.error(f"send_alert_from_app failed: {e}")
+        
+        try:
+            thread = threading.Thread(target=run_command)
+            thread.start()
+        except Exception as e:
+            logger.error(f"Failed to start thread in send_alert_from_app: {e}")

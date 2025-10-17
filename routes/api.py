@@ -13,38 +13,75 @@ blueprint = Blueprint('api', __name__)
 
 @blueprint.route('/send-command/all', methods=['POST'])
 async def send_command_all():
-        data = request.get_json()
-        mode = data.get('mode')
-        duration = data.get('duration', 5)
+    data = request.get_json()
+    mode = data.get('mode')
+    duration = data.get('duration', 5)
 
-        if mode not in CH9120_COMMANDS:
-            return jsonify({"status": "error", "message": "Invalid mode."}), 400
-       
-        hex_command = CH9120_COMMANDS[mode]
+    if mode not in CH9120_COMMANDS:
+        return jsonify({"status": "error", "message": "Invalid mode."}), 400
+    
+    hex_command = CH9120_COMMANDS[mode]
 
-        def run_command():
-            asyncio.run(CH9120Model.send_command_to_all(hex_command, duration))
-        
-        thread = threading.Thread(target=run_command)
-        thread.start()
-        return jsonify({"status": "success", "message": "Command is being sent to all devices."})
+    def run_command():
+        asyncio.run(CH9120Model.send_command_to_all(hex_command, duration))
+    
+    thread = threading.Thread(target=run_command)
+    thread.start()
+    return jsonify({"status": "success", "message": "Command is being sent to all devices."})
    
 @blueprint.route('/send-command/line', methods=['POST'])
 async def send_command_to_line():
-        data = request.get_json()
-        line = data.get('line')
-        mode = data.get('mode')
-        duration = data.get('duration', 5)
+    data = request.get_json()
+    line = data.get('line')
+    mode = data.get('mode')
+    duration = data.get('duration', 5)
 
-        if mode not in CH9120_COMMANDS:
-           return jsonify({"status": "error", "message": "Invalid mode."}), 400
-       
-        def run_command():
-            asyncio.run(CH9120Model.send_command_by_line(line, mode, duration))
-        
-        thread = threading.Thread(target=run_command)
-        thread.start()
-        return jsonify({"status": "success", "message": "Command is being sent to all devices."})
+    if mode not in CH9120_COMMANDS:
+        return jsonify({"status": "error", "message": "Invalid mode."}), 400
+    
+    def run_command():
+        asyncio.run(CH9120Model.send_command_by_line(line, mode, duration))
+    
+    thread = threading.Thread(target=run_command)
+    thread.start()
+    return jsonify({"status": "success", "message": "Command is being sent to device."})
+
+@blueprint.route('/send-command/device-office', methods=['POST'])
+async def send_to_device_and_office():
+    data = request.get_json()
+    device_station = data.get('line')
+    mode = data.get('mode')
+    duration = data.get('duration', 5)
+
+    if mode not in CH9120_COMMANDS:
+        return jsonify({"status": "error", "message": "Invalid mode."}), 400
+    
+    def run_command():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(CH9120Model.send_command_device_office(device_station, mode, duration))
+        loop.close()
+    
+    threading.Thread(target=run_command).start();
+    return jsonify({"status": "success", "message": "Command is being sent to device and office."})
+
+@blueprint.route('/send-command/turn-off-all/<line>', methods=['GET'])
+async def turn_off_all_devices(line):
+    def run_command():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            logger.info(f"[TURN_OFF_THREAD] Starting turn_off_device_and_office for line={line}")
+            result = loop.run_until_complete(CH9120Model.turn_off_device_and_office(line))
+            # logger.info(f"[TURN_OFF_THREAD] Completed with result: {result}")
+        except Exception as e:
+            logger.exception(f"[TURN_OFF_THREAD] Exception while running turn_off_device_and_office: {e}")
+        finally:
+            loop.close()
+            logger.info(f"[TURN_OFF_THREAD] Event loop closed for line={line}")
+
+    threading.Thread(target=run_command).start()
+    return jsonify({"status": "success", "message": "TURN_OFF command is being sent to device and office."})
 
 @blueprint.route('/create_device', methods=['POST'])
 def create_device():
