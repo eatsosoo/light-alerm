@@ -53,7 +53,11 @@ class NetworkService:
     def send_alert_from_app(self, line, command, duration=None):
         def run_command():
             try:
-                asyncio.run(CH9120Model.send_command_by_line(line, command, duration))
+                if line == "All":
+                    hex_command = Config.get_commands()[command]
+                    asyncio.run(CH9120Model.send_command_to_all(hex_command, duration))
+                else:
+                    asyncio.run(CH9120Model.send_command_by_line(line, command, duration))
             except Exception as e:
                 logger.error(f"send_alert_from_app failed: {e}")
         
