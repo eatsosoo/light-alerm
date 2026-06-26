@@ -5,7 +5,7 @@ import asyncio
 import threading
 from services.LoggerService import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 
 CH9120_COMMANDS = Config.get_commands()
 
@@ -71,14 +71,14 @@ async def turn_off_all_devices(line):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            logger.info(f"[TURN_OFF_THREAD] Starting turn_off_device_and_office for line={line}")
+            logger.info("Turn-off worker started | line=%s", line)
             result = loop.run_until_complete(CH9120Model.turn_off_device_and_office(line))
-            # logger.info(f"[TURN_OFF_THREAD] Completed with result: {result}")
+            logger.info("Turn-off worker finished | line=%s | result=%s", line, result)
         except Exception as e:
-            logger.exception(f"[TURN_OFF_THREAD] Exception while running turn_off_device_and_office: {e}")
+            logger.exception("Turn-off worker failed | line=%s | error=%s", line, e)
         finally:
             loop.close()
-            logger.info(f"[TURN_OFF_THREAD] Event loop closed for line={line}")
+            logger.info("Turn-off worker event loop closed | line=%s", line)
 
     threading.Thread(target=run_command).start()
     return jsonify({"status": "success", "message": "TURN_OFF command is being sent to device and office."})

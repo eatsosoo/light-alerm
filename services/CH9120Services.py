@@ -1,6 +1,9 @@
 import asyncio
-import logging
 from configs.config import Config
+from services.LoggerService import setup_logger
+
+
+logger = setup_logger(__name__)
 
 class CH9120Services:
     def __init__(self, ip, port):
@@ -16,8 +19,8 @@ class CH9120Services:
                 reader, writer = await asyncio.open_connection(self.ip, self.port)
             except (OSError, ConnectionRefusedError, asyncio.TimeoutError) as e:
                 return {"status": "error", "response": str(e)}
+
             writer.write(command)
-            
             await writer.drain()
 
             try:
@@ -37,7 +40,7 @@ class CH9120Services:
             return {"status": "success", "response": response.hex()}
 
         except Exception as e:
-            logging.error(f'Send command: {str(e)}')
+            logger.exception("Failed to send command to %s:%s: %s", self.ip, self.port, e)
             return {"status": "error", "response": str(e)}
 
 

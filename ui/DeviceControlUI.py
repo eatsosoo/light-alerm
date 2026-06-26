@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
+from services.LoggerService import get_today_log_path
 from services.NetworkService import NetworkService
 
 
@@ -18,6 +19,8 @@ class DeviceControlUI:
         self.records = []
         self.filtered_records = []
         self.network_service = NetworkService(self.host_ip, self.port)
+        self.log_refresh_interval_ms = 10000
+        self.log_refresh_job = None
 
         self.colors = {
             "bg": "#0f1115",
@@ -153,6 +156,7 @@ class DeviceControlUI:
         refresh_btn.pack(side="bottom", pady=(0, 10))
 
         self.load_log_file()
+        self.schedule_log_refresh()
 
     def create_filter_section(self, parent):
         filter_frame = tk.Frame(parent, bg=self.colors["panel"], padx=14, pady=12)
@@ -405,33 +409,38 @@ class DeviceControlUI:
 
         total = len(self.records)
         shown = len(self.filtered_records)
-        line = self.selected_line.get()
         if total == 0:
             self.status_var.set("No devices found")
         else:
             target_count = len(self.get_command_targets())
-            self.status_var.set(f"Showing {shown}/{total} devices | Target: {line} ({target_count})")
+            self.status_var.set(f"Showing {shown}/{total} devices | Targets visible: {target_count}")
 
     def get_command_targets(self):
-        line = self.selected_line.get()
-        if line == "All":
-            return self.records
-        return [device for device in self.records if str(device.get("line", "")) == line]
+        return list(self.filtered_records)
 
     def load_log_file(self):
-        log_file = "logs/app.log"
+        log_file = get_today_log_path()
         self.log_text.delete(1.0, tk.END)
 
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8") as f:
                 self.log_text.insert(tk.END, f.read())
         else:
-            self.log_text.insert(tk.END, "No log file found")
+            self.log_text.insert(tk.END, f"No log file found for today: {log_file}")
 
         self.log_text.see(tk.END)
 
+    def schedule_log_refresh(self):
+        if self.log_refresh_job:
+            self.root.after_cancel(self.log_refresh_job)
+        self.log_refresh_job = self.root.after(self.log_refresh_interval_ms, self.refresh_logs_periodically)
+
+    def refresh_logs_periodically(self):
+        if self.log_text.winfo_exists():
+            self.load_log_file()
+            self.schedule_log_refresh()
+
     def send_to_selected_line(self, command):
-        line = self.selected_line.get()
         duration = self.duration_entry.get().strip()
 
         if duration and not duration.isdigit():
@@ -439,14 +448,15 @@ class DeviceControlUI:
             self.duration_entry.focus_set()
             return
 
-        target_count = len(self.get_command_targets())
+        targets = self.get_command_targets()
+        target_count = len(targets)
         if target_count == 0:
             messagebox.showwarning("No target", "No devices match the current filter.")
             return
 
         self.status_var.set(f"Sending {command} to {target_count} device(s)...")
-        self.network_service.send_alert_from_app(line, command, duration)
-        self.status_var.set(f"Sent {command} to line {line} ({target_count} device(s))")
+        self.network_service.send_alert_to_devices(targets, command, duration)
+        self.status_var.set(f"Sent {command} to visible devices ({target_count})")
 
     def refetch_lines(self):
         self.load_devices()

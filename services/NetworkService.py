@@ -1,11 +1,11 @@
 import requests
-import logging
 from configs.config import Config
 from models.CH9120Model import CH9120Model
 import asyncio
 import threading
+from services.LoggerService import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 SSL = Config.get_ssl()
 class NetworkService:
     def __init__(self, ip, port, timeout=5):
@@ -16,10 +16,10 @@ class NetworkService:
     def fetch_devices_by_line(self, line):
         try:
             devices = CH9120Model.get_by_line('' if line == "All" else line)
-            logger.info("Fetched %s devices for line %s", len(devices), line)
+            logger.info("Loaded device list | line=%s | devices=%s", line, len(devices))
             return devices
         except Exception as e:
-            logger.error(f"fetch_devices_by_line failed: {e}")
+            logger.exception("Failed to load devices | line=%s | error=%s", line, e)
             return []
 
     def send_command(self, line, command, duration=None):
@@ -47,7 +47,7 @@ class NetworkService:
                 msg = response.json().get("message", str(e))
             except Exception:
                 msg = str(e)
-            logger.error(f"send_command failed: {msg}")
+            logger.error("HTTP command request failed | line=%s | command=%s | error=%s", line, command, msg)
             return False, msg
         
     def send_alert_from_app(self, line, command, duration=None):
@@ -59,10 +59,52 @@ class NetworkService:
                 else:
                     asyncio.run(CH9120Model.send_command_by_line(line, command, duration))
             except Exception as e:
-                logger.error(f"send_alert_from_app failed: {e}")
+                logger.exception(
+                    "Application command worker failed | line=%s | command=%s | error=%s",
+                    line,
+                    command,
+                    e,
+                )
         
         try:
             thread = threading.Thread(target=run_command)
             thread.start()
         except Exception as e:
-            logger.error(f"Failed to start thread in send_alert_from_app: {e}")
+            logger.exception(
+                "Failed to start command worker | line=%s | command=%s | error=%s",
+                line,
+                command,
+                e,
+            )
+
+    def send_alert_to_devices(self, devices, command, duration=None):
+        target_devices = list(devices)
+
+        def run_command():
+            try:
+                asyncio.run(
+                    CH9120Model.send_command_to_devices(
+                        target_devices,
+                        command,
+                        duration,
+                        scope="ui-visible",
+                    )
+                )
+            except Exception as e:
+                logger.exception(
+                    "Application command worker failed | scope=ui-visible | command=%s | devices=%s | error=%s",
+                    command,
+                    len(target_devices),
+                    e,
+                )
+
+        try:
+            thread = threading.Thread(target=run_command)
+            thread.start()
+        except Exception as e:
+            logger.exception(
+                "Failed to start command worker | scope=ui-visible | command=%s | devices=%s | error=%s",
+                command,
+                len(target_devices),
+                e,
+            )

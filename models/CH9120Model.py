@@ -3,8 +3,17 @@ from configs.config import Config
 from services.CH9120Services import CH9120Services
 from services.LoggerService import setup_logger
 
-logger = setup_logger()
+logger = setup_logger(__name__)
 CH9120_COMMANDS = Config.get_commands()
+
+
+def _device_label(device):
+    station = device.get("station_name") or "Unknown station"
+    ip = device.get("ip") or "unknown-ip"
+    port = device.get("port") or "unknown-port"
+    line = device.get("line") or "unknown-line"
+    return f"station={station} | line={line} | endpoint={ip}:{port}"
+
 
 class CH9120Model:
     @staticmethod
@@ -98,12 +107,18 @@ class CH9120Model:
         try:
             devices = CH9120Model.get_all()
             tasks = []
+            time_duration = int(duration) if duration else 5
 
-            logger.info(f"[COMMAND START] Sending command to {len(devices)} device(s)...")
+            logger.info(
+                "Command started | scope=all | command_hex=%s | duration=%ss | devices=%s",
+                hex_command,
+                time_duration,
+                len(devices),
+            )
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
-                task = asyncio.create_task(service.send_command(hex_command, duration))
+                task = asyncio.create_task(service.send_command(hex_command, time_duration))
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -113,24 +128,29 @@ class CH9120Model:
 
             for i, result in enumerate(results):
                 dev = devices[i]
-                identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
+                identity = _device_label(dev)
 
                 if isinstance(result, Exception):
-                    logger.error(f"[{identity}] Error: {result}")
+                    logger.error("Command failed | %s | error=%s", identity, result)
                     failure_count += 1
                 elif result.get("status") == "success":
-                    logger.info(f"[{identity}] Success")
+                    logger.info("Command succeeded | %s | response=%s", identity, result.get("response") or "-")
                     success_count += 1
                 else:
-                    logger.warning(f"[{identity}] Unknown response: {result}")
+                    logger.warning("Command returned unexpected response | %s | response=%s", identity, result)
                     failure_count += 1
 
-            logger.info(f"[COMMAND SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
+            logger.info(
+                "Command finished | scope=all | success=%s | failure=%s | total=%s",
+                success_count,
+                failure_count,
+                len(devices),
+            )
 
             return success_count > 0
 
         except Exception as e:
-            logger.exception(f"[COMMAND ERROR] send_command_to_all() failed: {e}")
+            logger.exception("Command failed before completion | scope=all | error=%s", e)
             return False
 
     
@@ -140,13 +160,19 @@ class CH9120Model:
             hex_command = CH9120_COMMANDS[mode]
             devices = CH9120Model.get_by_line(line)
             tasks = []
-            timeDuration = int(duration) if duration else 5
+            time_duration = int(duration) if duration else 5
 
-            logger.info(f"[LINE {line}] Sending command '{mode}' to {len(devices)} device(s)...")
+            logger.info(
+                "Command started | scope=line | line=%s | mode=%s | duration=%ss | devices=%s",
+                line,
+                mode,
+                time_duration,
+                len(devices),
+            )
 
             for device in devices:
                 service = CH9120Services(device['ip'], device['port'])
-                task = asyncio.create_task(service.send_command(hex_command, timeDuration))
+                task = asyncio.create_task(service.send_command(hex_command, time_duration))
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -156,24 +182,85 @@ class CH9120Model:
 
             for i, result in enumerate(results):
                 dev = devices[i]
-                identity = f"{dev['station_name']} ({dev['ip']}:{dev['port']})"
+                identity = _device_label(dev)
 
                 if isinstance(result, Exception):
-                    logger.error(f"[{identity}] Exception: {result}")
+                    logger.error("Command failed | %s | mode=%s | error=%s", identity, mode, result)
                     failure_count += 1
                 elif result.get("status") == "success":
-                    logger.info(f"[{identity}] Success")
+                    logger.info("Command succeeded | %s | mode=%s | response=%s", identity, mode, result.get("response") or "-")
                     success_count += 1
                 else:
-                    logger.warning(f"[{identity}] Unexpected result: {result}")
+                    logger.warning("Command returned unexpected response | %s | mode=%s | response=%s", identity, mode, result)
                     failure_count += 1
 
-            logger.info(f"[LINE {line} SUMMARY] {success_count}/{len(devices)} success, {failure_count} failure(s).")
+            logger.info(
+                "Command finished | scope=line | line=%s | mode=%s | success=%s | failure=%s | total=%s",
+                line,
+                mode,
+                success_count,
+                failure_count,
+                len(devices),
+            )
 
             return success_count == len(devices)
 
         except Exception as e:
-            logger.exception(f"[LINE {line} ERROR] send_command_by_line() failed: {e}")
+            logger.exception("Command failed before completion | scope=line | line=%s | error=%s", line, e)
+            return False
+
+    @staticmethod
+    async def send_command_to_devices(devices, mode, duration, scope="ui-visible"):
+        try:
+            hex_command = CH9120_COMMANDS[mode]
+            target_devices = list(devices)
+            tasks = []
+            time_duration = int(duration) if duration else 5
+
+            logger.info(
+                "Command started | scope=%s | mode=%s | duration=%ss | devices=%s",
+                scope,
+                mode,
+                time_duration,
+                len(target_devices),
+            )
+
+            for device in target_devices:
+                service = CH9120Services(device["ip"], device["port"])
+                task = asyncio.create_task(service.send_command(hex_command, time_duration))
+                tasks.append(task)
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            success_count = 0
+            failure_count = 0
+
+            for dev, result in zip(target_devices, results):
+                identity = _device_label(dev)
+
+                if isinstance(result, Exception):
+                    logger.error("Command failed | %s | mode=%s | error=%s", identity, mode, result)
+                    failure_count += 1
+                elif result.get("status") == "success":
+                    logger.info("Command succeeded | %s | mode=%s | response=%s", identity, mode, result.get("response") or "-")
+                    success_count += 1
+                else:
+                    logger.warning("Command returned unexpected response | %s | mode=%s | response=%s", identity, mode, result)
+                    failure_count += 1
+
+            logger.info(
+                "Command finished | scope=%s | mode=%s | success=%s | failure=%s | total=%s",
+                scope,
+                mode,
+                success_count,
+                failure_count,
+                len(target_devices),
+            )
+
+            return success_count == len(target_devices)
+
+        except Exception as e:
+            logger.exception("Command failed before completion | scope=%s | mode=%s | error=%s", scope, mode, e)
             return False
         
     @staticmethod
@@ -185,6 +272,7 @@ class CH9120Model:
             if mode == 'TURN_OFF':
                 hex_command2 = CH9120_COMMANDS['TURN_OFF']
 
+            time_duration = int(duration) if duration else 5
             device = CH9120Model.get_by_line(line)
             office_devices = CH9120Model.get_device_office()
 
@@ -194,10 +282,17 @@ class CH9120Model:
             for off_dev in office_devices:
                 targets.append((off_dev, hex_command2))
 
-            logger.info(f"[DEVICE {line} & OFFICE] Sending command '{mode}' to device and {len(office_devices)} office device(s)...")
+            logger.info(
+                "Command started | scope=device+office | line=%s | mode=%s | duration=%ss | office_devices=%s | total=%s",
+                line,
+                mode,
+                time_duration,
+                len(office_devices),
+                len(targets),
+            )
 
             tasks = [
-            CH9120Services(dev['ip'], dev['port']).send_command(cmd, duration)
+            CH9120Services(dev['ip'], dev['port']).send_command(cmd, time_duration)
                 for dev, cmd in targets
             ]
 
@@ -216,15 +311,22 @@ class CH9120Model:
                 })
 
                 if status == "success":
-                    logger.info(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> SUCCESS")
+                    logger.info("Command succeeded | %s | mode=%s", _device_label(dev), mode)
                 else:
-                    logger.error(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> FAILURE")
+                    logger.error("Command failed | %s | mode=%s | response=%s", _device_label(dev), mode, result)
 
-            logger.info(f"[SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
+            logger.info(
+                "Command finished | scope=device+office | line=%s | mode=%s | success=%s | failure=%s | total=%s",
+                line,
+                mode,
+                summary["success"],
+                summary["failure"],
+                len(targets),
+            )
             return summary
 
         except Exception as e:
-            logger.exception(f"[DEVICE {line} & OFFICE ERROR] send_command_device_office() failed: {e}")
+            logger.exception("Command failed before completion | scope=device+office | line=%s | error=%s", line, e)
             return {"success": 0, "failure": 0, "devices": [], "error": str(e)}
         
     @staticmethod
@@ -242,7 +344,11 @@ class CH9120Model:
                 targets.append(device[0])  # chỉ lấy thiết bị đầu tiên theo line
             targets.extend(office_devices)
 
-            logger.info(f"[TURN_OFF] Sending TURN_OFF to {len(targets)} device(s) (line={line} + office)...")
+            logger.info(
+                "Command started | scope=turn-off-device+office | line=%s | devices=%s",
+                line,
+                len(targets),
+            )
 
             tasks = [
                 CH9120Services(dev['ip'], dev['port']).send_command(hex_command, 0)
@@ -265,15 +371,25 @@ class CH9120Model:
                 summary["devices"].append(device_log)
 
                 if status == "success":
-                    logger.info(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> TURN_OFF SUCCESS")
+                    logger.info("Command succeeded | %s | mode=TURN_OFF", _device_label(dev))
                 else:
-                    logger.error(f"[{dev['station_name']}] {dev['ip']}:{dev['port']} -> TURN_OFF FAILURE ({device_log['error']})")
+                    logger.error(
+                        "Command failed | %s | mode=TURN_OFF | error=%s",
+                        _device_label(dev),
+                        device_log["error"],
+                    )
 
-            logger.info(f"[TURN_OFF SUMMARY] {summary['success']}/{len(targets)} success, {summary['failure']} failure(s).")
+            logger.info(
+                "Command finished | scope=turn-off-device+office | line=%s | success=%s | failure=%s | total=%s",
+                line,
+                summary["success"],
+                summary["failure"],
+                len(targets),
+            )
             return summary
 
         except Exception as e:
-            logger.exception(f"[TURN_OFF ERROR] turn_off_device_and_office() failed: {e}")
+            logger.exception("Command failed before completion | scope=turn-off-device+office | line=%s | error=%s", line, e)
             return {"success": 0, "failure": 0, "devices": [], "error": str(e)}
 
 
