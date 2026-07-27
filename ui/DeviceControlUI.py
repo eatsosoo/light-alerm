@@ -19,8 +19,11 @@ class DeviceControlUI:
         self.records = []
         self.filtered_records = []
         self.network_service = NetworkService(self.host_ip, self.port)
-        self.log_refresh_interval_ms = 10000
+        self.log_refresh_interval_ms = 1000
         self.log_refresh_job = None
+        self.log_file_path = None
+        self.log_file_position = 0
+        self.log_file_exists = False
 
         self.colors = {
             "bg": "#0f1115",
@@ -421,14 +424,53 @@ class DeviceControlUI:
     def load_log_file(self):
         log_file = get_today_log_path()
         self.log_text.delete(1.0, tk.END)
+        self.log_file_path = log_file
+        self.log_file_position = 0
+        self.log_file_exists = os.path.exists(log_file)
 
-        if os.path.exists(log_file):
-            with open(log_file, "r", encoding="utf-8") as f:
-                self.log_text.insert(tk.END, f.read())
+        if self.log_file_exists:
+            with open(log_file, "rb") as f:
+                content = f.read()
+                self.log_file_position = f.tell()
+            self.log_text.insert(tk.END, content.decode("utf-8", errors="replace"))
         else:
             self.log_text.insert(tk.END, f"No log file found for today: {log_file}")
 
         self.log_text.see(tk.END)
+
+    def append_new_logs(self):
+        log_file = get_today_log_path()
+
+        if log_file != self.log_file_path:
+            self.load_log_file()
+            return
+
+        if not os.path.exists(log_file):
+            if self.log_file_exists:
+                self.load_log_file()
+            return
+
+        file_size = os.path.getsize(log_file)
+        if not self.log_file_exists or file_size < self.log_file_position:
+            self.load_log_file()
+            return
+
+        if file_size == self.log_file_position:
+            return
+
+        with open(log_file, "rb") as f:
+            f.seek(self.log_file_position)
+            new_content = f.read()
+            self.log_file_position = f.tell()
+
+        self.log_file_exists = True
+        if not new_content:
+            return
+
+        should_follow = self.log_text.yview()[1] >= 0.999
+        self.log_text.insert(tk.END, new_content.decode("utf-8", errors="replace"))
+        if should_follow:
+            self.log_text.see(tk.END)
 
     def schedule_log_refresh(self):
         if self.log_refresh_job:
@@ -437,7 +479,7 @@ class DeviceControlUI:
 
     def refresh_logs_periodically(self):
         if self.log_text.winfo_exists():
-            self.load_log_file()
+            self.append_new_logs()
             self.schedule_log_refresh()
 
     def send_to_selected_line(self, command):
