@@ -1,0 +1,8 @@
+requests
+flask
+flask_cors
+PyYAML
+pyodbc
+netifaces
+flask[async]
+pyinstaller
