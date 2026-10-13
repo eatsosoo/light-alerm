@@ -1,8 +1,5 @@
-requests
-flask
-flask_cors
+Flask>=2.0
 PyYAML
 pyodbc
-netifaces
-flask[async]
+requests
 pyinstaller

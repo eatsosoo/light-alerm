@@ -3,3 +3,10 @@ logs
 dist
 dist.zip
 config.yaml
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.pem
+*.key

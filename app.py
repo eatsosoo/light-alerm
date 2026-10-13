@@ -1,52 +1,64 @@
-import tkinter as tk
-import threading
-from flask import Flask
-from flask_cors import CORS
-from routes.api import blueprint
-from configs.config import Config
+"""Application entry point for the desktop UI and HTTP server."""
+
+import argparse
 import logging
-import os
-from services.LoggerService import setup_logger
-from ui.DeviceControlUI import DeviceControlUI
+import threading
 
-logger = setup_logger()
+from werkzeug.serving import make_server
 
-HOST_IP = Config.get_host()
-PORT = Config.get_port()
-COMMANDS = Config.get_commands()
-SSL = Config.get_ssl()
+from light_alarm.api import create_app
+from light_alarm.runtime import Runtime
 
-app = Flask(__name__)
-CORS(app)
-app.register_blueprint(blueprint, url_prefix="/ch9120")
+logger = logging.getLogger("light_alarm.app")
 
-def run_flask():
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="CH9120 Light Alarm Control System")
+    parser.add_argument("--config", help="Path to config.yaml")
+    parser.add_argument("--headless", action="store_true", help="Run only the HTTP API")
+    args = parser.parse_args(argv)
+    runtime = Runtime.create(args.config)
+    server = None
+    server_thread = None
+    root = None
     try:
-        if SSL['ENABLED']:
-            logger.info('Running with SSL')
-            app.run(
-                host=HOST_IP,
-                port=PORT,
-                ssl_context=(SSL['CERT_PATH'], SSL['KEY_PATH'])
-            )
+        settings = runtime.settings
+        ssl_context = (settings.cert_path, settings.key_path) if settings.ssl_enabled else None
+        server = make_server(settings.host, settings.port, create_app(runtime),
+                             threaded=True, ssl_context=ssl_context)
+        logger.info("Started | endpoint=%s:%s | ssl=%s", settings.host, settings.port, settings.ssl_enabled)
+        if not settings.api_key:
+            logger.warning("API authentication is disabled; configure API_KEY to require credentials.")
+        if args.headless:
+            server.serve_forever()
         else:
-            logger.info('Running without SSL')
-            app.run(host=HOST_IP, port=PORT)
-    except Exception as e:
-        logger.exception(f"Flask failed to start: {e}")
+            import tkinter as tk
+            from light_alarm.ui.main_window import MainWindow
 
-def create_ui():
-    root = tk.Tk()
-    DeviceControlUI(root, HOST_IP, PORT, COMMANDS)
-    root.mainloop()
+            root = tk.Tk()
+            server_thread = threading.Thread(target=server.serve_forever, name="http-server", daemon=True)
+            server_thread.start()
+            MainWindow(root, runtime)
+            root.mainloop()
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested")
+    except Exception:
+        logger.exception("Application failed")
+        raise
+    finally:
+        if server_thread is not None:
+            server.shutdown()
+            server_thread.join(timeout=10)
+        if server is not None:
+            server.server_close()
+        runtime.close()
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+        logger.info("Stopped")
 
-if __name__ == '__main__':
-    os.makedirs("logs", exist_ok=True)
-    logging.getLogger('werkzeug').disabled = True
-    logger.info('Started')
 
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-
-    create_ui()
-    logger.info('Turn down')
+if __name__ == "__main__":
+    main()
