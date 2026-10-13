@@ -21,13 +21,19 @@ flowchart TD
 ## Trách nhiệm
 
 - `Settings`: đọc cấu hình và cung cấp dữ liệu; không mở kết nối.
+- `ConfigDocument`: kiểm tra và ghi file YAML theo đường dẫn khởi động; lưu bản sao, giữ khóa mở rộng và phát hiện thay đổi bên ngoài.
+- `SettingsTab`: form cấu hình và trình sửa danh sách lệnh. `Runtime.apply_settings` cập nhật dependency trên event loop khi không có yêu cầu đang hoạt động; cấu hình bind server được hoãn tới lần khởi động tiếp theo.
 - `DeviceRepository`: SQL có tham số, transaction, đóng cursor và connection.
 - `CH9120Client`: kết nối có timeout, gửi frame, nhận phản hồi và đóng socket.
 - `AlarmService`: xác định mục tiêu, loại endpoint trùng, quản lý thời lượng, gửi lệnh tắt khi kết thúc hoặc bị hủy, thay thế tác vụ cũ theo endpoint và tổng hợp kết quả. Chỉ gọi service bất đồng bộ qua event loop dùng chung.
 - `BackgroundWorker`: sở hữu event loop, nhận coroutine từ API/UI, quản lý kết quả job và hủy tác vụ khi đóng ứng dụng.
+- `RequestHistory`: lưu trạng thái, metadata và sự kiện log cho mỗi yêu cầu; bảo vệ dữ liệu dùng chung giữa worker, HTTP và Tkinter bằng lock. `ContextVar` truyền Request ID tới các tác vụ thiết bị và log liên quan. Handler ghi file bổ sung cùng mã để tra cứu trên đĩa.
 - `DeviceActions`: adapter để UI nhận future; không phụ thuộc Flask hoặc Tkinter.
 - `api`: kiểm tra HTTP input, xác thực khóa nếu có, trả response và chuyển yêu cầu tới các dependency.
 - `ui`: chỉ cập nhật widget trên luồng Tkinter; theo dõi future bằng `after`.
+- `RequestLogTab`: bảng theo dõi yêu cầu và chi tiết thiết bị/log. Mỗi lần cập nhật lấy snapshot từ RequestHistory, giữ lựa chọn đang xem và không đọc lại toàn bộ file log.
+- `ui/theme.py`: bảng màu tối và các thành phần Tk dùng chung. Màn hình điều khiển tách khu vực tìm thiết bị với bảng gửi lệnh; nút xem yêu cầu chuyển tab và chọn bằng ID đầy đủ.
+- `ui/widgets.py`: các thành phần Tk tự vẽ cho nút, ô nhập, tab và thanh cuộn. Nút hỗ trợ chuột, Enter, Space, focus và trạng thái vô hiệu; thanh cuộn tự ẩn và hỗ trợ kéo thumb. Ô nhập giữ widget Entry/Combobox bên trong; phần xem log giữ Text để hỗ trợ chọn và sao chép nội dung.
 
 ## Vòng đời
 

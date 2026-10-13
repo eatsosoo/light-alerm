@@ -7,11 +7,14 @@ from collections import OrderedDict
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from uuid import uuid4
 
+from light_alarm.services.request_history import request_id
+
 logger = logging.getLogger(__name__)
 
 
 class BackgroundWorker:
-    def __init__(self):
+    def __init__(self, history):
+        self.history = history
         self.loop = asyncio.new_event_loop()
         self._ready = threading.Event()
         self._lock = threading.Lock()
@@ -38,45 +41,65 @@ class BackgroundWorker:
                 raise RuntimeError("Application is shutting down.")
             return asyncio.run_coroutine_threadsafe(coroutine, self.loop)
 
-    def submit_job(self, coroutine):
+    def submit_tracked(self, coroutine, metadata):
         job_id = uuid4().hex
-        future = self.submit(coroutine)
+        self.history.create(job_id, metadata)
+        tracked = self._run_tracked(job_id, coroutine)
+        try:
+            future = self.submit(tracked)
+        except Exception:
+            coroutine.close()
+            self.history.update(job_id, status="failed", finished_at=self.history.timestamp(),
+                                message="Application is shutting down.")
+            raise
         with self._lock:
             self._jobs[job_id] = future
             # Retain active jobs and the latest 200 completed jobs.
             completed = [key for key, item in self._jobs.items() if item.done()]
             for key in completed[:-200]:
                 self._jobs.pop(key, None)
-        future.add_done_callback(lambda item: self._log_completion(job_id, item))
+        return job_id, future
+
+    def submit_job(self, coroutine, metadata):
+        job_id, _ = self.submit_tracked(coroutine, metadata)
         return job_id
 
-    @staticmethod
-    def _log_completion(job_id, future):
-        if future.cancelled():
-            logger.info("Job cancelled | job_id=%s", job_id)
-            return
-        error = future.exception()
-        if error:
-            logger.error("Job failed | job_id=%s | error=%s", job_id, error,
-                         exc_info=(type(error), error, error.__traceback__))
+    async def _run_tracked(self, job_id, coroutine):
+        token = request_id.set(job_id)
+        self.history.update(job_id, status="running", started_at=self.history.timestamp())
+        logger.info("Request started")
+        try:
+            result = await coroutine
+            total = len(result["devices"])
+            status = "completed"
+            if result["superseded"] == total and total:
+                status = "superseded"
+            elif result["failure"] == total and total:
+                status = "failed"
+            elif result["failure"] or result["superseded"]:
+                status = "partial"
+            logger.info("Request finished | status=%s", status)
+            self.history.update(job_id, status=status, result=result, target_count=total,
+                                counts={key: result[key] for key in ("success", "failure", "superseded")},
+                                finished_at=self.history.timestamp())
+            return result
+        except asyncio.CancelledError:
+            logger.info("Request cancelled")
+            self.history.update(job_id, status="cancelled", finished_at=self.history.timestamp())
+            raise
+        except Exception as error:
+            logger.exception("Request failed")
+            self.history.update(job_id, status="failed", finished_at=self.history.timestamp(),
+                                message=str(error))
+            raise
+        finally:
+            request_id.reset(token)
 
     def get_job(self, job_id):
-        with self._lock:
-            future = self._jobs.get(job_id)
-        if future is None:
-            return None
-        if future.cancelled():
-            return {"job_id": job_id, "status": "cancelled"}
-        if not future.done():
-            return {"job_id": job_id, "status": "running"}
-        try:
-            result = future.result()
-        except Exception:
-            return {"job_id": job_id, "status": "failed", "message": "Command failed; see system logs."}
-        status = "completed" if not result["failure"] and not result["superseded"] else "partial"
-        if result["failure"] and not result["success"] and not result["superseded"]:
-            status = "failed"
-        return {"job_id": job_id, "status": status, "result": result}
+        record = self.history.get(job_id, include_events=False)
+        if record is not None and record["message"]:
+            record["message"] = "Command failed; see system logs with this request ID."
+        return record
 
     async def _cancel_pending(self):
         current = asyncio.current_task()

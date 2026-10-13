@@ -42,8 +42,10 @@ def create_blueprint(runtime):
     alarms = runtime.alarms
     repository = runtime.repository
 
-    def accepted(coroutine):
-        job_id = runtime.worker.submit_job(coroutine)
+    def accepted(coroutine, mode, scope, duration):
+        job_id = runtime.worker.submit_job(coroutine, {
+            "source": "api", "mode": mode, "scope": scope, "duration": duration,
+        })
         status_url = url_for("api.get_job", job_id=job_id)
         response = jsonify(status="accepted", message="Command queued.", job_id=job_id, status_url=status_url)
         response.headers["Location"] = status_url
@@ -58,13 +60,13 @@ def create_blueprint(runtime):
     @blueprint.post("/send-command/all")
     def send_all():
         _, mode, duration = command_input()
-        return accepted(alarms.send_all(mode, duration))
+        return accepted(alarms.send_all(mode, duration), mode, "All", duration)
 
     @blueprint.post("/send-command/line")
     def send_line():
         data, mode, duration = command_input()
         line = alarms.validate_line(data.get("line"))
-        return accepted(alarms.send_line(line, mode, duration))
+        return accepted(alarms.send_line(line, mode, duration), mode, line, duration)
 
     @blueprint.post("/send-command/device-office")
     def send_office():
@@ -72,13 +74,13 @@ def create_blueprint(runtime):
         line = alarms.validate_line(data.get("line"))
         if mode != "TURN_OFF":
             alarms.validate_command("OFFICE", duration)
-        return accepted(alarms.send_device_office(line, mode, duration))
+        return accepted(alarms.send_device_office(line, mode, duration), mode, f"{line} + OFFICE", duration)
 
     @blueprint.route("/send-command/turn-off-all/<line>", methods=["GET", "POST"])
     def turn_off(line):
         # GET is retained for existing integrations; new clients should use POST.
         line = alarms.validate_line(line)
-        return accepted(alarms.send_device_office(line, "TURN_OFF", 0))
+        return accepted(alarms.send_device_office(line, "TURN_OFF", 0), "TURN_OFF", f"{line} + OFFICE", 0)
 
     @blueprint.get("/jobs/<job_id>")
     def get_job(job_id):

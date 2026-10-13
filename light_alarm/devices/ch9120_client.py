@@ -7,6 +7,10 @@ from contextlib import asynccontextmanager
 logger = logging.getLogger(__name__)
 
 
+class DeviceConnectionError(ConnectionError):
+    """An expected device connection failure with an actionable message."""
+
+
 class DeviceConnection:
     def __init__(self, reader, writer, endpoint, timeout):
         self.reader = reader
@@ -40,9 +44,17 @@ class CH9120Client:
 
     @asynccontextmanager
     async def connection(self, ip, port):
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(ip, int(port)), self.connect_timeout,
-        )
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, int(port)), self.connect_timeout,
+            )
+        except asyncio.TimeoutError as error:
+            raise DeviceConnectionError(
+                f"Không kết nối được tới {ip}:{port} sau {self.connect_timeout:g} giây. "
+                "Kiểm tra IP, port, nguồn thiết bị và kết nối mạng."
+            ) from error
+        except OSError as error:
+            raise DeviceConnectionError(f"Không mở được kết nối tới {ip}:{port}: {error}") from error
         try:
             yield DeviceConnection(reader, writer, (ip, port), self.connect_timeout)
         finally:

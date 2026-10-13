@@ -3,6 +3,8 @@ logs
 dist
 dist.zip
 config.yaml
+*.yaml.bak
+.config-*.tmp
 __pycache__/
 *.py[cod]
 .venv/

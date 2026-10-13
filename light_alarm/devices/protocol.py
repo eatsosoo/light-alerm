@@ -1,5 +1,7 @@
 """Encode the manufacturer's CH9120 command frame and CRC-16."""
 
+import re
+
 
 def crc16_modbus(data_hex):
     crc = 0xFFFF
@@ -12,7 +14,7 @@ def crc16_modbus(data_hex):
 
 def build_command(flash, volume, play, track):
     values = (flash, volume, play, track)
-    if any(not isinstance(value, str) or len(value) != 2 for value in values):
+    if any(not isinstance(value, str) or re.fullmatch(r"[0-9A-Fa-f]{2}", value) is None for value in values):
         raise ValueError("Each control value must contain exactly two HEX characters.")
     content = "0110001A0004" + "".join(values).upper()
     return content + crc16_modbus(content)

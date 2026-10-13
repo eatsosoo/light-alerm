@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from light_alarm.services.request_history import RequestContextFilter, RequestHistory
+
 
 def today_log_path(directory):
     return Path(directory) / f"app_{datetime.now():%Y-%m-%d}.log"
@@ -50,12 +52,16 @@ class DailyLogFileHandler(logging.Handler):
             self.release()
 
 
-def configure_logging(directory):
+def configure_logging(directory, history):
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("light_alarm")
     logger.setLevel(logging.INFO)
     logger.propagate = False
+    for existing in list(logger.handlers):
+        if isinstance(existing, RequestHistory):
+            logger.removeHandler(existing)
+    logger.addHandler(history)
     for existing in list(logger.handlers):
         if isinstance(existing, DailyLogFileHandler):
             if existing.directory == directory:
@@ -63,8 +69,9 @@ def configure_logging(directory):
             logger.removeHandler(existing)
             existing.close()
     handler = DailyLogFileHandler(directory)
+    handler.addFilter(RequestContextFilter())
     handler.setFormatter(logging.Formatter(
-        "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+        "%(asctime)s | %(levelname)-7s | request=%(request_id)s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     ))
     logger.addHandler(handler)

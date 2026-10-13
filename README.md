@@ -36,6 +36,7 @@ Nếu đã có `config.yaml`, có thể tiếp tục sử dụng. `SSL.ENABLED` 
 app.py                          Khởi tạo và đóng ứng dụng
 light_alarm/
   config.py                     Đọc, kiểm tra cấu hình
+    config_document.py            Đọc/lưu YAML, kiểm tra xung đột và tạo bản sao
   logging_setup.py              Log theo ngày
   runtime.py                    Ghép dependency và adapter cho desktop
   api/
@@ -46,6 +47,7 @@ light_alarm/
   services/
     alarm_service.py            Chọn mục tiêu và điều phối cảnh báo
     background_worker.py        Event loop dùng chung và kết quả job
+    request_history.py          Lịch sử yêu cầu và liên kết log theo Request ID
   devices/
     ch9120_client.py            Kết nối TCP và gửi lệnh
     protocol.py                 Tạo frame HEX, tính CRC-16
@@ -53,6 +55,10 @@ light_alarm/
     main_window.py              Cửa sổ và style
     device_tab.py               Danh sách, bộ lọc và lệnh điều khiển
     log_tab.py                  Đọc log tăng dần
+    request_log_tab.py          Bảng trạng thái và log từng yêu cầu
+    theme.py                    Màu sắc, nút, ô nhập và thẻ thống kê dùng chung
+    widgets.py                  Nút và ô nhập bo góc, tab phẳng, thanh cuộn tự ẩn
+    settings_tab.py             Sửa cấu hình YAML và danh sách lệnh trên UI
 tools/
   crc16_cli.py                   Công cụ tạo lệnh
   google_form.py                 Tiện ích độc lập, chỉ chạy khi gọi CLI
@@ -97,13 +103,35 @@ Body gửi lệnh theo line:
 {"line": "LINE_1", "mode": "TQC1", "duration": 5}
 ```
 
-Các endpoint gửi lệnh trả HTTP `202` sau khi nhận yêu cầu, với `status: accepted`, `job_id` và `status_url`. Client cần đọc `status_url` để biết kết quả. Job có trạng thái `running`, `completed`, `partial`, `failed` hoặc `cancelled`; kết quả chứa số thiết bị `success`, `failure`, `superseded` và chi tiết từng thiết bị.
+Các endpoint gửi lệnh trả HTTP `202` sau khi nhận yêu cầu, với `status: accepted`, `job_id` và `status_url`. Client cần đọc `status_url` để biết kết quả. Job có trạng thái `queued`, `running`, `completed`, `partial`, `failed`, `cancelled` hoặc `superseded`; kết quả chứa số thiết bị `success`, `failure`, `superseded` và chi tiết từng thiết bị.
 
-Job được lưu trong bộ nhớ, mất khi khởi động lại ứng dụng. Hệ thống giữ các job đang chạy và tối đa 200 job đã kết thúc, dọn khi nhận job mới. Một job bị thay thế toàn bộ cũng trả `partial`; chi tiết có `superseded`.
+Job được lưu trong bộ nhớ, mất khi khởi động lại ứng dụng. Hệ thống giữ các job đang chạy và tối đa 200 job đã kết thúc. Một job bị thay thế toàn bộ trả trạng thái `superseded`.
 
 Các endpoint CRUD nhận `station_name`, `ip`, `port`, `line`, `remark` và `user_code_created` hoặc `user_code_updated` tùy thao tác. Mã người dùng chấp nhận chuỗi hoặc số nguyên. Thiết bị không tồn tại trả `404`; dữ liệu không hợp lệ trả `400`.
 
 GET cho `/send-command/turn-off-all/<line>` vẫn được giữ để tương thích client cũ; client mới nên dùng POST.
+
+## Bảng theo dõi yêu cầu
+
+Tab `Yêu cầu` hiển thị mỗi lần gửi lệnh từ API hoặc desktop thành một dòng: thời gian, Request ID, nguồn, lệnh, phạm vi line, số thiết bị, trạng thái và số lượng gửi thành công / lỗi / bị thay thế. Danh sách tự cập nhật mỗi 500 ms, hỗ trợ tìm theo mã yêu cầu, lệnh, line, nguồn và lọc theo trạng thái. Thẻ thống kê hiển thị tổng yêu cầu trong lịch sử, số đang xử lý và số lỗi / một phần.
+
+Chọn một dòng để xem Request ID đầy đủ, thời điểm bắt đầu/kết thúc, thời gian đã chạy, kết quả từng thiết bị và log chỉ thuộc yêu cầu đó. Phần chi tiết có hai tab `Kết quả thiết bị` và `Log của yêu cầu`; yêu cầu chưa có kết quả mở tab log trước. Nút `Sao chép mã` sao chép mã đầy đủ; `Sao chép log` sao chép log kèm Request ID. Mã này trùng với `job_id` trả về từ API và mã rút gọn xuất hiện trên tab `Điều khiển`.
+
+Trạng thái gồm chờ xử lý, đang chạy, hoàn tất, một phần, lỗi, đã hủy và đã thay thế. Kết quả thiết bị xuất hiện sau khi yêu cầu kết thúc; log các bước gửi và tắt được cập nhật trong khi chạy. “Đã gửi” phản ánh kết quả thao tác TCP, chưa xác nhận trạng thái vật lý của đèn.
+
+Mỗi yêu cầu giữ tối đa 500 sự kiện log trong bộ nhớ; nếu vượt giới hạn, giao diện thông báo số dòng đã lược bớt. File log theo ngày giữ đầy đủ log với trường `request=<Request ID>`; log hệ thống ngoài yêu cầu có `request=-`. Tab `Nhật ký hệ thống` tiếp tục hiển thị file log của ngày hiện tại, hỗ trợ sao chép và bật/tắt theo dõi dòng mới.
+
+Bảng Yêu cầu chỉ chứa lịch sử của phiên chạy hiện tại. Log văn bản cũ vẫn còn trên đĩa theo chính sách lưu 14 ngày; các dòng log được tạo trước khi có tính năng này không có Request ID để tự nhóm lại.
+
+## Giao diện điều khiển
+
+Giao diện dùng bảng màu tối và nhãn tiếng Việt. Các nút và ô nhập có góc bo nhẹ, chiều cao thống nhất, trạng thái hover / focus bàn phím; tab không có khung nổi. Thanh cuộn mảnh không có nút mũi tên và tự ẩn khi nội dung vừa khung. Các thành phần được vẽ bằng Tk hiện có, không cần thêm dependency giao diện.
+
+Tab `Điều khiển` có danh sách bên trái, bảng gửi lệnh bên phải và các thẻ tổng số thiết bị đã tải, số thiết bị đang hiển thị / nhận lệnh và số line. Danh sách hỗ trợ sắp xếp theo cột, tìm kiếm, lọc line và trạng thái trống / lỗi tải. Vùng lệnh hỗ trợ cuộn bằng con lăn khi danh sách lệnh dài.
+
+Phạm vi gửi luôn là toàn bộ thiết bị đang hiển thị. Nút `Tắt cảnh báo` có màu đỏ và nằm đầu danh sách lệnh. Ô thời lượng được điền sẵn theo cấu hình; lệnh tắt và đọc không dùng thời lượng. Các nút lệnh bị vô hiệu hóa khi đang tải danh sách hoặc không có mục tiêu.
+
+Sau khi gửi, nút `Xem yêu cầu vừa gửi` mở thẳng dòng tương ứng trên tab Yêu cầu. Nếu yêu cầu đã bị loại khỏi lịch sử giới hạn, giao diện thông báo thay vì chọn nhầm dòng khác. Thanh cuối cửa sổ hiển thị số yêu cầu trong lịch sử và số đang xử lý.
 
 ## Các thay đổi cần lưu ý khi nâng cấp
 
@@ -114,7 +142,21 @@ GET cho `/send-command/turn-off-all/<line>` vẫn được giữ để tương t
 - CORS mở cho mọi origin đã được bỏ; client trình duyệt khác origin cần cấu hình proxy cùng origin hoặc bổ sung danh sách origin được phép theo môi trường triển khai.
 - `requests` chỉ còn phục vụ công cụ Google Form; ứng dụng chính không gọi HTTP tới chính nó.
 
+## Cấu hình YAML trên giao diện
+
+Tab `Cấu hình` đọc đúng file YAML được chọn khi khởi động (kể cả `--config` hoặc `LIGHT_ALARM_CONFIG`). Có thể sửa Máy chủ, Database, Thời gian và thêm/sửa/xóa lệnh HEX. Mật khẩu SQL và API key được che mặc định. Lệnh `TURN_OFF` bắt buộc, không thể xóa hoặc đổi tên.
+
+Bấm `Lưu và áp dụng` để kiểm tra dữ liệu, tạo bản sao `<file>.yaml.bak`, ghi YAML và cập nhật ứng dụng. Lệnh, database, API key và timeout áp dụng cho yêu cầu mới; danh sách nút Điều khiển được dựng lại từ cấu hình. IP / port / SSL server cần khởi động lại vì server đang lắng nghe địa chỉ cũ. Biến môi trường `LIGHT_ALARM_API_KEY` tiếp tục được ưu tiên hơn giá trị trong UI.
+
+Nếu đang có yêu cầu chờ/chạy, file vẫn được lưu nhưng cấu hình chưa áp dụng; chờ hoàn tất rồi bấm `Áp dụng lại`. Nút này áp dụng bản đã lưu, không lưu các thay đổi mới trên form. `Đọc lại YAML` thay thế nội dung đang sửa bằng nội dung file trên đĩa. Nếu file bị sửa bên ngoài sau lần đọc gần nhất, thao tác lưu bị chặn để tránh ghi đè.
+
+Các giá trị `TIMING.DEFAULT_DURATION`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT` và `DATABASE_TIMEOUT` tính bằng giây. Thời lượng mặc định có thể là 0; các timeout phải lớn hơn 0. Timeout database phải là số nguyên. Khi lưu, các khóa YAML ngoài form được giữ nguyên; comment và cách trình bày YAML được chuẩn hóa lại bởi PyYAML. File cấu hình thực tế không được thay đổi trong quá trình triển khai tính năng.
+
 ## Công cụ CRC
+
+Trên giao diện, mở tab `Tạo mã CRC16` để nhập Flash, Volume, Play và Track dưới dạng 2 ký tự HEX mỗi ô. Kết quả gồm mã HEX đầy đủ, CRC16 little-endian và bản xem theo từng byte; nút `Sao chép mã HEX` sao chép chuỗi đầy đủ. Khi sửa thông số, kết quả cũ được xóa để tránh sao chép nhầm. Nút `Giá trị mẫu` khôi phục `01 / 01 / 00 / 01`.
+
+Tab này dùng chung `light_alarm/devices/protocol.py` với công cụ dòng lệnh bên dưới và chỉ tính mã cục bộ.
 
 ```powershell
 python -m tools.crc16_cli --f 01 --v 01 --p 00 --t 01
@@ -140,4 +182,8 @@ pyinstaller app.spec
 
 ## Trạng thái xác minh
 
-Đợt refactor này chưa chạy test, chưa khởi động ứng dụng, chưa build `.exe`, chưa kết nối SQL và chưa gửi lệnh thiết bị theo yêu cầu của người dùng. Cần xác minh trên môi trường vận hành trước khi sử dụng bản refactor.
+Đã chạy 51 test gồm 35 test API, 4 test CRC, 9 test cấu hình/lưu YAML và 3 test áp dụng cấu hình; tất cả thành công. API dùng Flask test client, repository và thiết bị giả lập. Chạy lại bằng `python -m unittest discover -s tests -v`. Chi tiết phạm vi API ở `docs/api-testing.md`.
+
+Đã kiểm tra riêng layout trình sửa lệnh YAML bằng Tk ngoài màn hình: ô nhập và hàng nút thao tác nằm trong khung ở 1240×860 và 1040×740, với hai mức scaling 1.0 và 1.5. Chạy lại bằng `python -m unittest discover -s tests -p test_settings_layout.py -v`.
+
+Chưa xác minh SQL Server và thiết bị thật, toàn bộ luồng giao diện hoặc build `.exe`. Test API không xác nhận khả năng kết nối thiết bị ngoài mạng.

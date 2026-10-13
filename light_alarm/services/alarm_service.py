@@ -3,14 +3,17 @@
 import asyncio
 import logging
 
+from light_alarm.services.request_history import request_id
+
 logger = logging.getLogger(__name__)
 
 
 class AlarmService:
-    def __init__(self, repository, client, settings):
+    def __init__(self, repository, client, settings, history):
         self.repository = repository
         self.client = client
         self.settings = settings
+        self.history = history
         self._active = {}
         self._locks = {}
 
@@ -73,6 +76,8 @@ class AlarmService:
             unique.setdefault(endpoint, (dict(device), mode))
         if not unique:
             raise ValueError("No target devices found.")
+        self.history.update(request_id.get(), target_count=len(unique))
+        logger.info("Targets resolved | devices=%s | duration=%ss", len(unique), duration)
         results = await asyncio.gather(*(
             self._replace(endpoint, device, mode, duration)
             for endpoint, (device, mode) in unique.items()
@@ -91,6 +96,7 @@ class AlarmService:
         async with lock:
             previous = self._active.get(endpoint)
             if previous and not previous.done():
+                logger.info("Replacing active command | endpoint=%s:%s", *endpoint)
                 if not previous.cancelling():
                     previous.cancel()
                 # Complete the previous TURN_OFF before starting the next alarm.
@@ -120,6 +126,8 @@ class AlarmService:
 
     async def _send(self, device, mode, duration):
         try:
+            logger.info("Sending command | station=%s | line=%s | endpoint=%s:%s | mode=%s",
+                        device.get("station_name"), device.get("line"), device["ip"], device["port"], mode)
             timed = mode not in ("TURN_OFF", "READ_ALL")
             async with self.client.connection(device["ip"], device["port"]) as connection:
                 attempted = False
@@ -127,6 +135,7 @@ class AlarmService:
                     # A failed drain may still have delivered bytes to the device.
                     attempted = True
                     started = await connection.write(self.settings.commands[mode])
+                    logger.info("Command written | endpoint=%s:%s | mode=%s", device["ip"], device["port"], mode)
                     elapsed = asyncio.get_running_loop().time() - started
                     timeout = self.settings.response_timeout
                     if timed:
@@ -141,12 +150,22 @@ class AlarmService:
                         await self._turn_off(connection, device)
             logger.info("Command sent | endpoint=%s:%s | mode=%s", device["ip"], device["port"], mode)
             return self._result(device, "success", mode, response=response)
+        except asyncio.CancelledError:
+            logger.info("Device command cancelled or replaced | endpoint=%s:%s | mode=%s",
+                        device["ip"], device["port"], mode)
+            raise
+        except (OSError, asyncio.TimeoutError) as error:
+            message = str(error) or f"Thao tác TCP tới {device['ip']}:{device['port']} hết thời gian chờ."
+            logger.error("Command failed | endpoint=%s:%s | mode=%s | error=%s",
+                         device["ip"], device["port"], mode, message)
+            return self._result(device, "failure", mode, error=message)
         except Exception as error:
             logger.exception("Command failed | endpoint=%s:%s | mode=%s", device["ip"], device["port"], mode)
             return self._result(device, "failure", mode, error=str(error))
 
     async def _turn_off(self, connection, device):
         command = self.settings.commands["TURN_OFF"]
+        logger.info("Sending automatic TURN_OFF | endpoint=%s:%s", device["ip"], device["port"])
         try:
             await connection.write(command)
         except (OSError, RuntimeError, asyncio.TimeoutError):
