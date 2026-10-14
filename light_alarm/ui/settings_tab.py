@@ -5,13 +5,15 @@ import tkinter as tk
 from tkinter import ttk
 
 from light_alarm.config_document import ConfigDocument
+from light_alarm.config import local_host_ip
+from light_alarm.ui.widgets import SwitchButton
 from light_alarm.ui.theme import COLORS, button, entry, label, scrollbar, tabs
 
 
 class SettingsTab:
     GROUPS = (
         ("Máy chủ", (
-            ("HOST_IP", "IP server", "127.0.0.1", "text"),
+            ("HOST_IP", "IP server", "", "text"),
             ("PORT", "Port server", "5000", "int"),
             ("API_KEY", "API key", "", "secret"),
             ("SSL.CERT_PATH", "Đường dẫn chứng chỉ SSL", "", "text"),
@@ -44,6 +46,7 @@ class SettingsTab:
         self.ssl_enabled = tk.BooleanVar()
         self.show_secrets = tk.BooleanVar()
         self.secret_fields = []
+        self.ssl_fields = []
         self.name, self.hex_value = tk.StringVar(), tk.StringVar()
         self.frame = ttk.Frame(notebook)
         notebook.add(self.frame, text="Cấu hình")
@@ -70,13 +73,19 @@ class SettingsTab:
                 self.variables[path], self.kinds[path] = variable, kind
                 field = entry(cell, variable)
                 field.pack(fill="x", pady=(7, 0))
+                if path in ("SSL.CERT_PATH", "SSL.KEY_PATH"):
+                    self.ssl_fields.append(field.input)
                 if kind == "secret":
                     field.input.configure(show="•")
                     self.secret_fields.append(field.input)
             if title == "Máy chủ":
-                ttk.Checkbutton(page, text="Bật HTTPS / SSL", variable=self.ssl_enabled).grid(row=3, column=0, sticky="w")
-                label(page, "LIGHT_ALARM_API_KEY trong môi trường được ưu tiên hơn API key trong file.",
-                      muted=True, size=9, wraplength=850).grid(row=4, column=0, columnspan=2, sticky="w", pady=14)
+                self.ssl_switch = SwitchButton(page, "HTTPS / SSL", self.ssl_enabled, COLORS,
+                                                command=self._update_ssl_fields)
+                self.ssl_switch.grid(row=3, column=0, sticky="w")
+                label(page, "LIGHT_ALARM_API_KEY trong môi trường được ưu tiên. IP / port ở đây là HTTP API; "
+                      "kết nối đèn cần thiết bị ở TCP Server (PDF ghi mặc định là TCP Client).",
+                      muted=True, size=9, wraplength=850, justify="left").grid(
+                          row=4, column=0, columnspan=2, sticky="w", pady=14)
         self.command_page = tk.Frame(pages, bg=COLORS["panel"], padx=20, pady=20)
         pages.add(self.command_page, text="Lệnh HEX")
         self.pages = pages
@@ -89,8 +98,8 @@ class SettingsTab:
         self.apply_button.pack(side="left", padx=8)
         self.reload_button = button(footer, "Đọc lại YAML", self.reload)
         self.reload_button.pack(side="left")
-        ttk.Checkbutton(footer, text="Hiện mật khẩu", variable=self.show_secrets,
-                        command=self._show_secrets).pack(side="right")
+        SwitchButton(footer, "Hiện mật khẩu", self.show_secrets, COLORS,
+                     command=self._show_secrets).pack(side="right")
         self.feedback = label(self.frame, variable=self.status, muted=True, wraplength=1000, justify="left",
                               bg=COLORS["bg"])
         self.feedback.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 12))
@@ -141,8 +150,11 @@ class SettingsTab:
                 value = value.get(key) if isinstance(value, dict) else None
             if value is None:
                 value = next(default for _, specs in self.GROUPS for field, _, default, _ in specs if field == path)
+            if path == "HOST_IP" and not value:
+                value = local_host_ip()
             variable.set(str(value))
         self.ssl_enabled.set(bool((data.get("SSL") or {}).get("ENABLED", False)))
+        self._update_ssl_fields()
         self.commands = dict((data.get("CH9120") or {}).get("COMMANDS", {}))
         self.new_command()
         self._render_commands()
@@ -275,6 +287,11 @@ class SettingsTab:
             self._load_form()
         except (ValueError, OSError) as error:
             self._set_status(str(error), error=True)
+
+    def _update_ssl_fields(self):
+        for control in self.ssl_fields:
+            control.configure(state="normal" if self.ssl_enabled.get() else "disabled",
+                              disabledbackground=COLORS["panel_alt"], disabledforeground=COLORS["muted"])
 
     def _show_secrets(self):
         for control in self.secret_fields:

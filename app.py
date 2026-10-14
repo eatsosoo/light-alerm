@@ -3,6 +3,9 @@
 import argparse
 import logging
 import threading
+import sys
+import traceback
+from pathlib import Path
 
 from werkzeug.serving import make_server
 
@@ -10,6 +13,48 @@ from light_alarm.api import create_app
 from light_alarm.runtime import Runtime
 
 logger = logging.getLogger("light_alarm.app")
+
+
+def create_http_server(settings, application):
+    ssl_context = (settings.cert_path, settings.key_path) if settings.ssl_enabled else None
+    try:
+        return make_server(settings.host, settings.port, application,
+                           threaded=True, ssl_context=ssl_context)
+    except SystemExit as error:
+        raise RuntimeError(
+            f"Không mở được HTTP API tại {settings.host}:{settings.port}. "
+            "Kiểm tra HOST_IP trong config.yaml có thuộc máy hiện tại và PORT chưa bị chiếm."
+        ) from error
+
+
+def run():
+    try:
+        main()
+    except Exception as error:
+        directory = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+        error_path = directory / "startup-error.log"
+        details = traceback.format_exc()
+        try:
+            error_path.write_text(details, encoding="utf-8")
+            message = f"{error}\n\nChi tiết: {error_path}"
+        except OSError:
+            message = str(error)
+        if "--headless" not in sys.argv:
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                dialog = tk.Tk()
+                dialog.withdraw()
+                try:
+                    messagebox.showerror("Light Alarm · Không thể khởi động", message, parent=dialog)
+                finally:
+                    dialog.destroy()
+            except Exception:
+                pass
+        if sys.stderr is not None:
+            print(details, file=sys.stderr)
+        return 1
+    return 0
 
 
 def main(argv=None):
@@ -23,9 +68,7 @@ def main(argv=None):
     root = None
     try:
         settings = runtime.settings
-        ssl_context = (settings.cert_path, settings.key_path) if settings.ssl_enabled else None
-        server = make_server(settings.host, settings.port, create_app(runtime),
-                             threaded=True, ssl_context=ssl_context)
+        server = create_http_server(settings, create_app(runtime))
         logger.info("Started | endpoint=%s:%s | ssl=%s", settings.host, settings.port, settings.ssl_enabled)
         if not settings.api_key:
             logger.warning("API authentication is disabled; configure API_KEY to require credentials.")
@@ -61,4 +104,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(run())

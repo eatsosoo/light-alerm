@@ -8,6 +8,7 @@ from light_alarm.ui.crc_tab import CRCTab
 from light_alarm.ui.log_tab import LogTab
 from light_alarm.ui.request_log_tab import RequestLogTab
 from light_alarm.ui.settings_tab import SettingsTab
+from light_alarm.ui.network_config_tab import NetworkConfigTab
 from light_alarm.ui.theme import COLORS, label, tabs
 
 
@@ -44,6 +45,7 @@ class MainWindow:
         self.logs = LogTab(root, notebook, runtime.settings.log_directory, self.colors)
         self.crc = CRCTab(root, notebook)
         self.settings_tab = SettingsTab(root, notebook, runtime, self.devices.apply_settings)
+        self.network_config = NetworkConfigTab(root, notebook, runtime.actions)
         self.devices.on_request = self.open_request
         self.notebook = notebook
         footer = tk.Frame(root, bg=COLORS["bg"], padx=24, pady=9)
@@ -73,6 +75,7 @@ class MainWindow:
         self.logs.close()
         self.crc.close()
         self.settings_tab.close()
+        self.network_config.close()
         self.root.destroy()
 
     def setup_styles(self):

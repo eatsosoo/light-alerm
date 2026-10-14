@@ -59,6 +59,7 @@ light_alarm/
     theme.py                    Màu sắc, nút, ô nhập và thẻ thống kê dùng chung
     widgets.py                  Nút và ô nhập bo góc, tab phẳng, thanh cuộn tự ẩn
     settings_tab.py             Sửa cấu hình YAML và danh sách lệnh trên UI
+    network_config_tab.py       Tìm, đọc và cấu hình module mạng CH9120 qua UDP
 tools/
   crc16_cli.py                   Công cụ tạo lệnh
   google_form.py                 Tiện ích độc lập, chỉ chạy khi gọi CLI
@@ -135,6 +136,8 @@ Sau khi gửi, nút `Xem yêu cầu vừa gửi` mở thẳng dòng tương ứn
 
 ## Các thay đổi cần lưu ý khi nâng cấp
 
+Khi chạy lần đầu mà chưa có `config.yaml` cạnh ứng dụng, app tự tạo file từ cấu hình mẫu được đóng gói, tự lấy IPv4 của máy và dùng port `7000`. Khi không tìm thấy IPv4 phù hợp, dùng `127.0.0.1`. Mặc định dùng HTTP; bật switch HTTPS / SSL trong tab Cấu hình để nhập đường dẫn chứng chỉ và private key. Ba lệnh mặc định là `FLASH_ONLY` (chỉ nháy đèn), `TURN_OFF`, `SOUND_FLASH` (nháy đèn và phát âm thanh). Cấu hình đã lưu được giữ nguyên. Nhập thông tin SQL trong tab `Cấu hình` để tải danh sách thiết bị; tab `Cấu hình mạng` có thể dùng ngay mà không cần SQL. Đường dẫn cấu hình được chỉ định bằng `--config` hoặc `LIGHT_ALARM_CONFIG` vẫn phải tồn tại.
+
 - Các module `configs`, `controllers`, `models`, `routes`, `services`, `ui` ở thư mục gốc được thay bằng package `light_alarm`. Code Python bên ngoài import các đường dẫn cũ cần cập nhật.
 - API gửi lệnh chuyển từ `200/success` sang `202/accepted`, kèm endpoint lấy kết quả.
 - `get_device` trả một object thay vì danh sách; thao tác thêm trả `201`, sửa/xóa không tồn tại trả `404`.
@@ -154,9 +157,13 @@ Các giá trị `TIMING.DEFAULT_DURATION`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT`
 
 ## Công cụ CRC
 
-Trên giao diện, mở tab `Tạo mã CRC16` để nhập Flash, Volume, Play và Track dưới dạng 2 ký tự HEX mỗi ô. Kết quả gồm mã HEX đầy đủ, CRC16 little-endian và bản xem theo từng byte; nút `Sao chép mã HEX` sao chép chuỗi đầy đủ. Khi sửa thông số, kết quả cũ được xóa để tránh sao chép nhầm. Nút `Giá trị mẫu` khôi phục `01 / 01 / 00 / 01`.
+Trên giao diện, mở tab `Tạo mã CRC16` để chọn Flash, Volume, Play và Track từ các danh sách chỉ đọc. Theo PDF nhà cung cấp, Flash 01–07 (6: một dài + một ngắn; 7: một dài + hai ngắn), Volume 00–08, Play phát lặp hoặc 1–16 lần (HEX 01–10), Track 1–250 (HEX 01–FA). Track theo thứ tự chép file, không theo tên file. Kết quả gồm mã HEX đầy đủ, CRC16 little-endian và bản xem theo từng byte; nút `Sao chép mã HEX` sao chép chuỗi đầy đủ. Khi đổi lựa chọn, kết quả cũ được xóa để tránh sao chép nhầm. Nút `Giá trị mẫu` khôi phục `01 / 01 / 00 / 01`.
+
+Đã đối chiếu hai frame mẫu trong PDF và thêm khoảng cách gói tối thiểu 200 ms theo từng thiết bị. Ứng dụng đang chủ động mở TCP tới đèn nên cần thiết bị ở TCP Server; TCP Client mặc định của nhà cung cấp cần một TCP listener riêng, hiện chưa có trong ứng dụng. HOST_IP/PORT của YAML là HTTP API. Xem `docs/device-configuration.md` để phân biệt vai trò mạng và giới hạn xác minh.
 
 Tab này dùng chung `light_alarm/devices/protocol.py` với công cụ dòng lệnh bên dưới và chỉ tính mã cục bộ.
+
+Tab `Cấu hình mạng` tìm module CH9120 trên cùng mạng LAN bằng broadcast UDP, cho chọn địa chỉ card mạng, đọc cấu hình theo MAC và ghi lại các thông số tên, IP tĩnh/DHCP, subnet, gateway, chế độ TCP/UDP, port nguồn/đích và baud rate. Sau khi ghi, module khởi động lại; quét lại để xác nhận IP mới. Máy tính cần ở cùng subnet và cho phép UDP broadcast qua cổng cấu hình 50000, cổng cục bộ 60000. Tính năng dùng giao thức cấu hình module, tách biệt với lệnh điều khiển đèn và API HTTP. Thiết bị thật chưa được xác minh từ ứng dụng này.
 
 ```powershell
 python -m tools.crc16_cli --f 01 --v 01 --p 00 --t 01
@@ -175,8 +182,12 @@ python -m tools.google_form --url "<formResponse URL>" --data "form-data.json" -
 ## Đóng gói Windows
 
 ```powershell
-pyinstaller app.spec
+.\build.cmd
 ```
+
+Lệnh tự dùng Python trong `venv` nếu có, hoặc `python` trên PATH, và đóng gói theo `app.spec`. Có thể truyền thêm tùy chọn, ví dụ `.\build.cmd --clean`. Kết quả nằm ở `dist/app.exe`.
+
+Nếu chưa có `dist/config.yaml`, lệnh build chép cấu hình từ thư mục dự án (hoặc cấu hình mẫu nếu chưa có cấu hình thực tế). Cấu hình đã tồn tại trong `dist` được giữ nguyên. `HOST_IP` phải là địa chỉ IP hiện có trên máy chạy ứng dụng; có thể dùng `127.0.0.1` để chỉ phục vụ máy đó. Khi khởi động thất bại, ứng dụng hiện thông báo và ghi chi tiết vào `startup-error.log` cạnh file `.exe`.
 
 Đặt `config.yaml` cạnh `dist/app.exe`; nếu bật SSL, triển khai thêm file chứng chỉ và private key theo đường dẫn cấu hình. PyInstaller thu thập package Python qua import; cấu hình mẫu được kèm trong bundle, còn cấu hình thực tế được đọc từ file bên ngoài.
 

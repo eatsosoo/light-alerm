@@ -3,6 +3,8 @@
 import os
 import sys
 import math
+import socket
+import ipaddress
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,6 +15,22 @@ def application_directory():
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
+
+
+def local_host_ip():
+    """Choose a local IPv4 address, with loopback available offline."""
+    try:
+        addresses = [item[4][0] for item in socket.getaddrinfo(
+            socket.gethostname(), None, socket.AF_INET, socket.SOCK_STREAM,
+        )]
+        candidates = [address for address in addresses
+                      if not ipaddress.IPv4Address(address).is_loopback
+                      and not ipaddress.IPv4Address(address).is_link_local]
+        if candidates:
+            return candidates[0]
+    except OSError:
+        pass
+    return "127.0.0.1"
 
 
 @dataclass(frozen=True)
@@ -38,7 +56,21 @@ class Settings:
 
     @classmethod
     def load(cls, path=None):
-        config_path = Path(path or os.environ.get("LIGHT_ALARM_CONFIG") or application_directory() / "config.yaml").resolve()
+        explicit_path = path or os.environ.get("LIGHT_ALARM_CONFIG")
+        config_path = Path(explicit_path or application_directory() / "config.yaml").resolve()
+        if not explicit_path and not config_path.exists():
+            resource_directory = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+            template = (resource_directory / "config.yaml.example").read_text(encoding="utf-8")
+            initial_data = yaml.safe_load(template)
+            initial_data["HOST_IP"] = initial_data.get("HOST_IP") or local_host_ip()
+            cls.from_mapping(initial_data, config_path)
+            template = yaml.safe_dump(initial_data, allow_unicode=True, sort_keys=False)
+            try:
+                # Exclusive creation keeps another instance's configuration intact.
+                with config_path.open("x", encoding="utf-8") as config_file:
+                    config_file.write(template)
+            except FileExistsError:
+                pass
         with config_path.open(encoding="utf-8") as config_file:
             data = yaml.safe_load(config_file)
         return cls.from_mapping(data, config_path)
@@ -110,7 +142,7 @@ class Settings:
 
         return cls(
             directory=config_path.parent,
-            host=str(data.get("HOST_IP") or "127.0.0.1"),
+            host=str(data.get("HOST_IP") or local_host_ip()),
             port=port,
             commands=dict(commands),
             database=dict(database),

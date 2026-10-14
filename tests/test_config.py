@@ -11,6 +11,7 @@ import yaml
 
 from light_alarm.config import Settings
 from light_alarm.config_document import ConfigDocument
+from light_alarm.devices.protocol import build_command
 
 
 class ConfigTests(unittest.TestCase):
@@ -32,6 +33,42 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.config_path, self.path.resolve())
         self.assertEqual(settings.database["SQL_PASSWORD"], "")
         self.assertEqual(settings.default_duration, 5)
+
+    def test_first_run_creates_default_config_from_bundled_template(self):
+        directory = Path(self.temp.name)
+        resource_directory = Path(__file__).resolve().parent.parent
+        with patch.dict(os.environ, {}, clear=True), \
+                patch("light_alarm.config.application_directory", return_value=directory), \
+                patch("light_alarm.config.local_host_ip", return_value="10.20.30.40"), \
+                patch("light_alarm.config.sys._MEIPASS", str(resource_directory), create=True):
+            settings = Settings.load()
+        self.assertEqual(settings.host, "10.20.30.40")
+        self.assertEqual(settings.config_path, (directory / "config.yaml").resolve())
+        self.assertTrue(settings.config_path.is_file())
+        self.assertIn("TURN_OFF", settings.commands)
+        self.assertEqual(set(settings.commands), {"FLASH_ONLY", "TURN_OFF", "SOUND_FLASH"})
+        self.assertEqual(settings.commands["FLASH_ONLY"], build_command("01", "00", "00", "01"))
+        self.assertEqual(settings.commands["SOUND_FLASH"], build_command("01", "01", "00", "01"))
+        self.assertFalse(settings.ssl_enabled)
+        ConfigDocument(settings.config_path)
+
+    def test_first_run_preserves_existing_default_config(self):
+        default_path = Path(self.temp.name) / "config.yaml"
+        original = self.path.read_bytes()
+        default_path.write_bytes(original)
+        with patch.dict(os.environ, {}, clear=True), \
+                patch("light_alarm.config.application_directory", return_value=default_path.parent):
+            Settings.load()
+        self.assertEqual(default_path.read_bytes(), original)
+
+    def test_missing_explicit_config_is_not_replaced_with_template(self):
+        missing = Path(self.temp.name) / "missing.yaml"
+        with self.assertRaises(FileNotFoundError):
+            Settings.load(missing)
+        with patch.dict(os.environ, {"LIGHT_ALARM_CONFIG": str(missing)}):
+            with self.assertRaises(FileNotFoundError):
+                Settings.load()
+        self.assertFalse(missing.exists())
 
     def test_missing_database_field_is_identified(self):
         del self.data["DATABASE"]["SQL_SERVER"]

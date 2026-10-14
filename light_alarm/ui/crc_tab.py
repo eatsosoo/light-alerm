@@ -1,26 +1,37 @@
 """Desktop command generator sharing the CRC implementation with the CLI."""
 
-import re
 import tkinter as tk
 from tkinter import ttk
 
-from light_alarm.devices.protocol import build_command
-from light_alarm.ui.theme import COLORS, button, entry, label, separator
+from light_alarm.devices.protocol import FLASH_MODES, build_command
+from light_alarm.ui.theme import COLORS, button, entry, label, select, separator
 
 
 class CRCTab:
     FIELDS = (
-        ("flash", "Flash · chế độ nháy", "01", "Ví dụ 01. Nhập một byte HEX."),
+        ("flash", "Flash · chế độ nháy", "01", "Chế độ 1–7 theo tài liệu thiết bị."),
         ("volume", "Volume · âm lượng", "01", "00 để tắt âm thanh."),
         ("play", "Play · chế độ phát", "00", "00 để phát lặp."),
-        ("track", "Track · bài âm thanh", "01", "Ví dụ 01 để chọn bài số 1."),
+        ("track", "Track · bài âm thanh", "01", "Bài 1–250, theo thứ tự chép file."),
     )
+    OPTIONS = {
+        "flash": {f"{value:02X} · {title}": f"{value:02X}" for value, title in FLASH_MODES.items()},
+        "volume": {f"{value:02X} · " + ("Tắt âm thanh" if value == 0 else f"Âm lượng {value}"): f"{value:02X}"
+                   for value in range(9)},
+        "play": {f"{value:02X} · " + ("Phát lặp" if value == 0 else f"Phát {value} lần"): f"{value:02X}"
+                 for value in range(17)},
+        "track": {f"{value:02X} · Bài {value}": f"{value:02X}" for value in range(1, 251)},
+    }
+
+    @classmethod
+    def option_label(cls, key, value):
+        return next(title for title, code in cls.OPTIONS[key].items() if code == value)
 
     def __init__(self, root, notebook):
         self.root = root
         self.frame = ttk.Frame(notebook)
         notebook.add(self.frame, text="Tạo mã CRC16")
-        self.values = {key: tk.StringVar(value=default) for key, _, default, _ in self.FIELDS}
+        self.values = {key: tk.StringVar(value=self.option_label(key, default)) for key, _, default, _ in self.FIELDS}
         self.command = tk.StringVar()
         self.crc = tk.StringVar()
         self.preview = tk.StringVar()
@@ -30,7 +41,7 @@ class CRCTab:
         header = tk.Frame(self.frame, bg=COLORS["bg"], padx=16, pady=16)
         header.pack(fill="x")
         label(header, "Tạo mã lệnh thiết bị", size=16, bold=True, bg=COLORS["bg"]).pack(anchor="w")
-        label(header, "Nhập 4 byte điều khiển để tạo mã HEX kèm CRC16 Modbus.",
+        label(header, "Chọn 4 thông số điều khiển để tạo mã HEX kèm CRC16 Modbus.",
               muted=True, bg=COLORS["bg"]).pack(anchor="w", pady=(5, 0))
 
         panel = tk.Frame(self.frame, bg=COLORS["panel"], padx=22, pady=22)
@@ -43,7 +54,7 @@ class CRCTab:
             cell = tk.Frame(fields, bg=COLORS["panel"])
             cell.grid(row=0, column=index, sticky="ew", padx=(0 if index == 0 else 14, 0))
             label(cell, title, size=10, bold=True).pack(anchor="w")
-            control = entry(cell, self.values[key], width=8)
+            control = select(cell, self.values[key], width=18, state="readonly", values=list(self.OPTIONS[key]))
             control.pack(fill="x", pady=(9, 6))
             control.bind("<Return>", lambda event: self.generate())
             label(cell, hint, size=9, muted=True, wraplength=210, justify="left").pack(anchor="w")
@@ -52,7 +63,7 @@ class CRCTab:
         actions.pack(fill="x", pady=(20, 0))
         button(actions, "Tạo mã lệnh", self.generate, kind="primary").pack(side="left")
         button(actions, "Giá trị mẫu", self.reset).pack(side="left", padx=10)
-        label(actions, "Mỗi ô: 2 ký tự HEX, từ 00 đến FF.", muted=True, size=9).pack(side="left", padx=6)
+        label(actions, "Giá trị HEX được hiển thị trước mỗi lựa chọn.", muted=True, size=9).pack(side="left", padx=6)
         separator(panel).pack(fill="x", pady=22)
 
         label(panel, "MÃ HEX ĐẦY ĐỦ", size=9, muted=True).pack(anchor="w")
@@ -69,8 +80,8 @@ class CRCTab:
               muted=True, wraplength=950, justify="left").pack(anchor="w", pady=(18, 8))
         self.feedback = label(panel, variable=self.status, size=10, wraplength=950, justify="left")
         self.feedback.pack(anchor="w")
-        label(self.frame, "Dùng cùng thuật toán với tools/crc16_cli.py. Mã được tạo theo frame CH9120 của dự án; "
-              "giá trị điều khiển cần phù hợp với tài liệu thiết bị.", bg=COLORS["bg"], muted=True,
+        label(self.frame, "Theo PDF thiết bị, mục 8-1 / 8-2 (trang 9–10). Track được đánh số theo thứ tự chép file, "
+              "không theo tên file. Muốn tắt đèn, dùng lệnh TURN_OFF trong màn hình Điều khiển.", bg=COLORS["bg"], muted=True,
               size=9, wraplength=1000, justify="left").pack(anchor="w", padx=20)
         for variable in self.values.values():
             self._traces.append((variable, variable.trace_add("write", self._invalidate)))
@@ -88,17 +99,14 @@ class CRCTab:
     def generate(self):
         values = {}
         for key, title, _, _ in self.FIELDS:
-            value = self.values[key].get().strip().upper()
-            if re.fullmatch(r"[0-9A-F]{2}", value) is None:
+            value = self.OPTIONS[key].get(self.values[key].get())
+            if value is None:
                 self._invalidate()
-                self.status.set(f"{title}: nhập đúng 2 ký tự HEX (00–FF), ví dụ 01 hoặc 0A.")
+                self.status.set(f"{title}: chọn một giá trị trong danh sách.")
                 self.feedback.configure(fg=COLORS["warning"])
                 self.inputs[key].focus_set()
                 return
             values[key] = value
-        for key, value in values.items():
-            if self.values[key].get() != value:
-                self.values[key].set(value)
         command = build_command(values["flash"], values["volume"], values["play"], values["track"])
         self._generated = command
         self.command.set(command)
@@ -116,7 +124,7 @@ class CRCTab:
 
     def reset(self):
         for key, _, default, _ in self.FIELDS:
-            self.values[key].set(default)
+            self.values[key].set(self.option_label(key, default))
         self.generate()
 
     def close(self):

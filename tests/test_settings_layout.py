@@ -15,6 +15,35 @@ from light_alarm.ui.theme import COLORS, tabs
 
 
 class SettingsLayoutTests(unittest.TestCase):
+    def test_ssl_switch_controls_certificate_fields_and_preserves_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.yaml"
+            path.write_text(yaml.safe_dump({
+                "CH9120": {"COMMANDS": {"TURN_OFF": "00"}},
+                "DATABASE": dict(SQL_DRIVER="fake", SQL_SERVER="fake", SQL_DATABASE="fake",
+                                 SQL_USER="fake", SQL_PASSWORD=""),
+                "SSL": {"ENABLED": False, "CERT_PATH": "cert.pem", "KEY_PATH": "key.pem"},
+            }), encoding="utf-8")
+            root = tk.Tk()
+            root.withdraw()
+            tab = None
+            try:
+                notebook = tabs(root)
+                runtime = SimpleNamespace(settings=Settings.load(path))
+                tab = SettingsTab(root, notebook, runtime, lambda settings: None)
+                self.assertTrue(all(field.cget("state") == "disabled" for field in tab.ssl_fields))
+                tab.ssl_switch.invoke()
+                self.assertTrue(tab.ssl_enabled.get())
+                self.assertTrue(all(field.cget("state") == "normal" for field in tab.ssl_fields))
+                tab.ssl_switch.invoke()
+                self.assertFalse(tab.ssl_enabled.get())
+                self.assertEqual(tab.variables["SSL.CERT_PATH"].get(), "cert.pem")
+                self.assertEqual(tab.variables["SSL.KEY_PATH"].get(), "key.pem")
+            finally:
+                if tab:
+                    tab.close()
+                root.destroy()
+
     def test_command_editor_and_actions_fit_supported_window_sizes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.yaml"

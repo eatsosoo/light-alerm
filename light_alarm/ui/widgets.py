@@ -102,6 +102,52 @@ class RoundedButton(tk.Canvas):
     config = configure
 
 
+class SwitchButton(tk.Canvas):
+    """Boolean switch operable with the mouse, Enter and Space."""
+
+    def __init__(self, parent, text, variable, palette, command=None):
+        self.variable, self.palette, self.command = variable, palette, command
+        self.text = text
+        self._focused = False
+        self._font = tkfont.Font(font=("Segoe UI", 10))
+        super().__init__(parent, width=64 + self._font.measure(text), height=38,
+                         bg=parent_color(parent, palette["panel"]),
+                         bd=0, highlightthickness=0, takefocus=True, cursor="hand2")
+        self.bind("<Configure>", self._draw)
+        self.bind("<Button-1>", self.invoke)
+        self.bind("<Return>", self.invoke)
+        self.bind("<space>", self.invoke)
+        self.bind("<FocusIn>", lambda event: self._focus(True))
+        self.bind("<FocusOut>", lambda event: self._focus(False))
+        self._trace = variable.trace_add("write", self._draw)
+
+    def _focus(self, value):
+        self._focused = value
+        self._draw()
+
+    def invoke(self, event=None):
+        self.focus_set()
+        self.variable.set(not self.variable.get())
+        if self.command:
+            self.command()
+        return "break"
+
+    def _draw(self, *args):
+        self.delete("all")
+        on = self.variable.get()
+        fill = self.palette["accent"] if on else self.palette["border"]
+        rounded(self, 2, 7, 48, 31, 12, fill=fill,
+                outline=self.palette["text"] if self._focused else fill)
+        x = 27 if on else 5
+        self.create_oval(x, 10, x + 18, 28, fill=self.palette["text"], outline="")
+        self.create_text(60, 19, text=self.text, anchor="w", font=self._font,
+                         fill=self.palette["text"])
+
+    def destroy(self):
+        self.variable.trace_remove("write", self._trace)
+        super().destroy()
+
+
 class RoundedField(tk.Frame):
     def __init__(self, parent, variable, palette, select=False, **options):
         self.palette = palette

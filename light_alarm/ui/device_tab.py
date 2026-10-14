@@ -140,7 +140,7 @@ class DeviceTab:
         ordered += (["READ_ALL"] if "READ_ALL" in self.commands else [])
         for name in ordered:
             title = {"TURN_OFF": "Tắt cảnh báo", "READ_ALL": "Đọc trạng thái",
-                     "FLASH_ONLY": "Nháy đèn"}.get(name, name.replace("_", " "))
+                     "FLASH_ONLY": "Nháy đèn", "SOUND_FLASH": "Âm thanh và nháy đèn"}.get(name, name.replace("_", " "))
             kind = "danger" if name == "TURN_OFF" else "secondary"
             control = button(self._command_contents, title, lambda mode=name: self.send_to_selected_line(mode), kind=kind, anchor="w")
             control.pack(fill="x", pady=(0, 7))

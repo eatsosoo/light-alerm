@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 
 from light_alarm.config import Settings
 from light_alarm.devices.ch9120_client import CH9120Client
+from light_alarm.devices.ch9120_config import CH9120ConfigClient
 from light_alarm.logging_setup import configure_logging
 from light_alarm.repositories.device_repository import DeviceRepository
 from light_alarm.services.alarm_service import AlarmService
@@ -19,6 +20,7 @@ class DeviceActions:
         self.repository = repository
         self.alarms = alarms
         self.worker = worker
+        self.config_client = CH9120ConfigClient()
 
     def load_devices(self):
         return self.worker.submit(asyncio.to_thread(self.repository.get_all))
@@ -33,6 +35,20 @@ class DeviceActions:
              "duration": duration, "target_count": len(targets)},
         )
         return job_id, future
+
+    def local_network_adapters(self):
+        return self.config_client.local_ipv4_addresses()
+
+    def discover_modules(self, bind_ip="0.0.0.0"):
+        return self.worker.submit(asyncio.to_thread(self.config_client.discover, bind_ip))
+
+    def read_module_config(self, module, bind_ip="0.0.0.0"):
+        return self.worker.submit(asyncio.to_thread(self.config_client.get_config, dict(module), bind_ip))
+
+    def configure_module(self, current, updates, bind_ip="0.0.0.0"):
+        return self.worker.submit(asyncio.to_thread(
+            self.config_client.set_config, dict(current), dict(updates), bind_ip,
+        ))
 
 
 @dataclass
@@ -67,7 +83,7 @@ class Runtime:
                              cert_path=old.cert_path, key_path=old.key_path)
             self.repository.settings = active
             self.alarms.settings = active
-            self.alarms.client = CH9120Client(active)
+            self.alarms.client = CH9120Client(active, pacer=getattr(self.alarms.client, "pacer", None))
             self.settings = active
             return restart
         return self.worker.submit(apply())
