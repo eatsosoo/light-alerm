@@ -1,12 +1,13 @@
 """Edit YAML settings and command definitions without editing source files."""
 
 import copy
+import secrets
 import tkinter as tk
 from tkinter import ttk
 
 from light_alarm.config_document import ConfigDocument
 from light_alarm.config import local_host_ip
-from light_alarm.ui.widgets import SwitchButton
+from light_alarm.ui.widgets import EyeButton, SwitchButton
 from light_alarm.ui.theme import COLORS, button, entry, label, scrollbar, tabs
 
 
@@ -44,8 +45,9 @@ class SettingsTab:
         self._closed = False
         self.status = tk.StringVar()
         self.ssl_enabled = tk.BooleanVar()
-        self.show_secrets = tk.BooleanVar()
-        self.secret_fields = []
+        self.secret_fields = {}
+        self.secret_buttons = {}
+        self.secret_visibility = {}
         self.ssl_fields = []
         self.name, self.hex_value = tk.StringVar(), tk.StringVar()
         self.frame = ttk.Frame(notebook)
@@ -71,13 +73,22 @@ class SettingsTab:
                 label(cell, caption, size=10).pack(anchor="w")
                 variable = tk.StringVar(value=default)
                 self.variables[path], self.kinds[path] = variable, kind
-                field = entry(cell, variable)
-                field.pack(fill="x", pady=(7, 0))
+                field_row = tk.Frame(cell, bg=COLORS["panel"])
+                field_row.pack(fill="x", pady=(7, 0))
+                field = entry(field_row, variable)
+                field.pack(side="left", fill="x", expand=True)
                 if path in ("SSL.CERT_PATH", "SSL.KEY_PATH"):
                     self.ssl_fields.append(field.input)
                 if kind == "secret":
                     field.input.configure(show="•")
-                    self.secret_fields.append(field.input)
+                    self.secret_fields[path] = field.input
+                    self.secret_visibility[path] = False
+                    eye = EyeButton(field_row, COLORS, command=lambda key=path: self._toggle_secret(key))
+                    eye.pack(side="right", padx=(4, 0))
+                    self.secret_buttons[path] = eye
+                if path == "API_KEY":
+                    self.generate_key_button = button(field_row, "Tạo khóa", self.generate_api_key)
+                    self.generate_key_button.pack(side="right", padx=(4, 0))
             if title == "Máy chủ":
                 self.ssl_switch = SwitchButton(page, "HTTPS / SSL", self.ssl_enabled, COLORS,
                                                 command=self._update_ssl_fields)
@@ -98,8 +109,6 @@ class SettingsTab:
         self.apply_button.pack(side="left", padx=8)
         self.reload_button = button(footer, "Đọc lại YAML", self.reload)
         self.reload_button.pack(side="left")
-        SwitchButton(footer, "Hiện mật khẩu", self.show_secrets, COLORS,
-                     command=self._show_secrets).pack(side="right")
         self.feedback = label(self.frame, variable=self.status, muted=True, wraplength=1000, justify="left",
                               bg=COLORS["bg"])
         self.feedback.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 12))
@@ -293,9 +302,16 @@ class SettingsTab:
             control.configure(state="normal" if self.ssl_enabled.get() else "disabled",
                               disabledbackground=COLORS["panel_alt"], disabledforeground=COLORS["muted"])
 
-    def _show_secrets(self):
-        for control in self.secret_fields:
-            control.configure(show="" if self.show_secrets.get() else "•")
+    def generate_api_key(self):
+        self.variables["API_KEY"].set(secrets.token_urlsafe(32))
+        self._set_status("Đã tạo API key mới. Bấm Lưu và áp dụng để sử dụng. "
+                         "LIGHT_ALARM_API_KEY trong môi trường vẫn được ưu tiên.")
+
+    def _toggle_secret(self, path):
+        visible = not self.secret_visibility[path]
+        self.secret_visibility[path] = visible
+        self.secret_fields[path].configure(show="" if visible else "•")
+        self.secret_buttons[path].set_visible(visible)
 
     def close(self):
         self._closed = True

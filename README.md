@@ -81,7 +81,9 @@ API và desktop dùng chung `AlarmService` và một event loop. SQL chạy qua 
 
 ## HTTP API
 
-Prefix của tất cả endpoint là `/ch9120`. Có thể cấu hình `API_KEY` hoặc biến môi trường `LIGHT_ALARM_API_KEY`; client khi đó gửi header `X-API-Key`. Biến môi trường được ưu tiên. Nếu để trống cả hai, API tiếp tục cho phép truy cập không cần khóa. API không tự bật CORS cho mọi origin.
+Các endpoint được gọi trực tiếp từ URL gốc của server, ví dụ `http://<HOST_IP>:<PORT>/send-command/all` (dùng `https` nếu bật SSL). Client đang dùng prefix cũ cần cập nhật URL theo bảng bên dưới. Có thể cấu hình `API_KEY` hoặc biến môi trường `LIGHT_ALARM_API_KEY`; client khi đó gửi header `X-API-Key`. Biến môi trường được ưu tiên. Nếu để trống cả hai, API tiếp tục cho phép truy cập không cần khóa. API không tự bật CORS cho mọi origin.
+
+Trong tab `Cấu hình` → `Máy chủ`, bấm `Tạo khóa` cạnh ô API key để tạo khóa ngẫu nhiên từ 32 byte bảo mật. Khóa mới chỉ được lưu và sử dụng sau khi bấm `Lưu và áp dụng`; sau đó cập nhật header `X-API-Key` của client. Có thể dùng nút mắt để xem khóa. Biến môi trường `LIGHT_ALARM_API_KEY`, nếu có, vẫn được ưu tiên hơn khóa trong form.
 
 | Method | Endpoint | Chức năng |
 | --- | --- | --- |
@@ -185,11 +187,11 @@ python -m tools.google_form --url "<formResponse URL>" --data "form-data.json" -
 .\build.cmd
 ```
 
-Lệnh tự dùng Python trong `venv` nếu có, hoặc `python` trên PATH, và đóng gói theo `app.spec`. Có thể truyền thêm tùy chọn, ví dụ `.\build.cmd --clean`. Kết quả nằm ở `dist/app.exe`.
+Lệnh tự dùng Python trong `venv` nếu có, hoặc `python` trên PATH, và đóng gói theo `app.spec`. Có thể truyền thêm tùy chọn, ví dụ `.\build.cmd --clean`. Kết quả nằm ở `dist/LightAlarm.exe`.
 
 Nếu chưa có `dist/config.yaml`, lệnh build chép cấu hình từ thư mục dự án (hoặc cấu hình mẫu nếu chưa có cấu hình thực tế). Cấu hình đã tồn tại trong `dist` được giữ nguyên. `HOST_IP` phải là địa chỉ IP hiện có trên máy chạy ứng dụng; có thể dùng `127.0.0.1` để chỉ phục vụ máy đó. Khi khởi động thất bại, ứng dụng hiện thông báo và ghi chi tiết vào `startup-error.log` cạnh file `.exe`.
 
-Đặt `config.yaml` cạnh `dist/app.exe`; nếu bật SSL, triển khai thêm file chứng chỉ và private key theo đường dẫn cấu hình. PyInstaller thu thập package Python qua import; cấu hình mẫu được kèm trong bundle, còn cấu hình thực tế được đọc từ file bên ngoài.
+Đặt `config.yaml` cạnh `dist/LightAlarm.exe`; nếu bật SSL, triển khai thêm file chứng chỉ và private key theo đường dẫn cấu hình. PyInstaller thu thập package Python qua import; cấu hình mẫu được kèm trong bundle, còn cấu hình thực tế được đọc từ file bên ngoài.
 
 ## Trạng thái xác minh
 

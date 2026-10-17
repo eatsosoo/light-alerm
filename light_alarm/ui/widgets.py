@@ -148,6 +148,58 @@ class SwitchButton(tk.Canvas):
         super().destroy()
 
 
+class EyeButton(tk.Canvas):
+    """Compact keyboard accessible eye control for showing a secret field."""
+
+    def __init__(self, parent, palette, command):
+        self.palette, self.command = palette, command
+        self.visible = False
+        self._hovered = self._focused = False
+        super().__init__(parent, width=36, height=38, bg=parent_color(parent, palette["panel"]),
+                         bd=0, highlightthickness=0, takefocus=True, cursor="hand2")
+        self.bind("<Configure>", self._draw)
+        self.bind("<Enter>", lambda event: self._set_hover(True))
+        self.bind("<Leave>", lambda event: self._set_hover(False))
+        self.bind("<FocusIn>", lambda event: self._set_focus(True))
+        self.bind("<FocusOut>", lambda event: self._set_focus(False))
+        self.bind("<Button-1>", self._invoke)
+        self.bind("<Return>", self._invoke)
+        self.bind("<space>", self._invoke)
+
+    def set_visible(self, visible):
+        self.visible = visible
+        self._draw()
+
+    def _set_hover(self, value):
+        self._hovered = value
+        self._draw()
+
+    def _set_focus(self, value):
+        self._focused = value
+        self._draw()
+
+    def _invoke(self, event=None):
+        self.focus_set()
+        self.command()
+        return "break"
+
+    def _draw(self, event=None):
+        self.delete("all")
+        width, height = self.winfo_width(), self.winfo_height()
+        if self._hovered:
+            rounded(self, 2, 3, width - 2, height - 3, 7,
+                    fill=self.palette["panel_alt"], outline="")
+        color = self.palette["accent"] if self._focused else self.palette["muted"]
+        cx, cy = width / 2, height / 2
+        self.create_line(cx - 9, cy, cx - 5, cy - 4, cx, cy - 6,
+                         cx + 5, cy - 4, cx + 9, cy,
+                         cx + 5, cy + 4, cx, cy + 6, cx - 5, cy + 4,
+                         cx - 9, cy, smooth=True, splinesteps=20, fill=color, width=1.6)
+        self.create_oval(cx - 2, cy - 2, cx + 2, cy + 2, fill=color, outline="")
+        if not self.visible:
+            self.create_line(cx - 10, cy + 9, cx + 10, cy - 9, fill=color, width=1.6)
+
+
 class RoundedField(tk.Frame):
     def __init__(self, parent, variable, palette, select=False, **options):
         self.palette = palette

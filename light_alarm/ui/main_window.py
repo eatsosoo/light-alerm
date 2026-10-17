@@ -2,6 +2,8 @@
 
 import tkinter as tk
 from tkinter import ttk
+from pathlib import Path
+import sys
 
 from light_alarm.ui.device_tab import DeviceTab
 from light_alarm.ui.crc_tab import CRCTab
@@ -20,6 +22,9 @@ class MainWindow:
         self._summary_job = None
         self.session_summary = tk.StringVar()
         root.title("Light Alarm · Điều khiển cảnh báo")
+        asset_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2])) / "assets"
+        self._app_icon = tk.PhotoImage(file=str(asset_root / "light_alarm.png"))
+        root.iconphoto(True, self._app_icon)
         root.geometry("1240x860")
         root.minsize(1040, 740)
         root.configure(bg=self.colors["bg"])

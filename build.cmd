@@ -21,7 +21,7 @@ if not "%BUILD_RESULT%"=="0" (
         )
     )
     echo.
-    echo Build complete: "%~dp0dist\app.exe"
+    echo Build complete: "%~dp0dist\LightAlarm.exe"
 )
 
 popd

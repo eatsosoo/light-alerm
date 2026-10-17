@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def create_app(runtime):
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
-    app.register_blueprint(create_blueprint(runtime), url_prefix="/ch9120")
+    app.register_blueprint(create_blueprint(runtime))
 
     @app.before_request
     def authenticate():

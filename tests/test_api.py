@@ -20,7 +20,6 @@ from light_alarm.services.background_worker import BackgroundWorker
 from light_alarm.services.request_history import RequestHistory, request_id
 
 
-PREFIX = "/ch9120"
 
 
 class MemoryRepository:
@@ -127,7 +126,7 @@ class ApiTests(unittest.TestCase):
         self.logger.propagate = self.old_propagate
 
     def send(self, path="/send-command/line", **payload):
-        return self.client.post(PREFIX + path, json={"mode": "ALARM", "duration": 0, "line": "LINE1", **payload})
+        return self.client.post(path, json={"mode": "ALARM", "duration": 0, "line": "LINE1", **payload})
 
     def wait_job(self, response, timeout=3):
         self.assertEqual(response.status_code, 202, response.get_json())
@@ -151,39 +150,39 @@ class ApiTests(unittest.TestCase):
                 "port": "6800", "line": "LINE2", "remark": None, **overrides}
 
     def test_read_all_devices_and_lines(self):
-        response = self.client.get(PREFIX + "/get-all-devices")
+        response = self.client.get("/get-all-devices")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.get_json()["devices"]), 4)
-        lines = self.client.get(PREFIX + "/get-all-lines").get_json()["lines"]
+        lines = self.client.get("/get-all-lines").get_json()["lines"]
         self.assertEqual(lines, [{"line": "LINE1"}, {"line": "LINE10"}, {"line": "OFFICE"}])
 
     def test_read_single_device_and_missing_device(self):
-        response = self.client.get(PREFIX + "/get_device/1")
+        response = self.client.get("/get_device/1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.get_json()["device"], dict)
         self.assertEqual(response.get_json()["device"]["keyid"], 1)
-        self.assertEqual(self.client.get(PREFIX + "/get_device/999").status_code, 404)
+        self.assertEqual(self.client.get("/get_device/999").status_code, 404)
 
     def test_read_line_uses_exact_match(self):
-        response = self.client.get(PREFIX + "/get_devices_by_line/LINE1")
+        response = self.client.get("/get_devices_by_line/LINE1")
         self.assertEqual([item["keyid"] for item in response.get_json()["devices"]], [1, 2])
-        self.assertEqual(self.client.get(PREFIX + "/get_devices_by_line/missing").get_json()["devices"], [])
+        self.assertEqual(self.client.get("/get_devices_by_line/missing").get_json()["devices"], [])
 
     def test_create_update_delete_lifecycle(self):
-        response = self.client.post(PREFIX + "/create_device", json=self.fields())
+        response = self.client.post("/create_device", json=self.fields())
         self.assertEqual(response.status_code, 201)
         self.assertEqual(self.repository.get_by_id(5)["port"], 6800)
         data = self.fields(station_name="Updated", user_code_updated=123)
-        response = self.client.put(PREFIX + "/update_device/5", json=data)
+        response = self.client.put("/update_device/5", json=data)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.repository.get_by_id(5)["station_name"], "Updated")
-        self.assertEqual(self.client.delete(PREFIX + "/delete_device/5").status_code, 200)
-        self.assertEqual(self.client.get(PREFIX + "/get_device/5").status_code, 404)
+        self.assertEqual(self.client.delete("/delete_device/5").status_code, 200)
+        self.assertEqual(self.client.get("/get_device/5").status_code, 404)
 
     def test_update_delete_missing_device(self):
-        self.assertEqual(self.client.put(PREFIX + "/update_device/999",
+        self.assertEqual(self.client.put("/update_device/999",
                          json=self.fields(user_code_updated="tester")).status_code, 404)
-        self.assertEqual(self.client.delete(PREFIX + "/delete_device/999").status_code, 404)
+        self.assertEqual(self.client.delete("/delete_device/999").status_code, 404)
 
     def test_invalid_device_fields_are_rejected_without_writes(self):
         cases = [{"port": value} for value in (None, True, 0, -1, 65536, 1.5, "1.5", "bad")]
@@ -192,23 +191,23 @@ class ApiTests(unittest.TestCase):
         cases += [{"remark": 123}]
         for fields in cases:
             with self.subTest(fields=fields):
-                response = self.client.post(PREFIX + "/create_device", json=self.fields(**fields))
+                response = self.client.post("/create_device", json=self.fields(**fields))
                 self.assertEqual(response.status_code, 400, response.get_json())
                 self.assertEqual(len(self.repository.devices), 4)
 
     def test_invalid_json_bodies(self):
         for data in (None, [], "text", 12, True):
             with self.subTest(data=data):
-                response = self.client.post(PREFIX + "/send-command/all", data=__import__("json").dumps(data),
+                response = self.client.post("/send-command/all", data=__import__("json").dumps(data),
                                             content_type="application/json")
                 self.assertEqual(response.status_code, 400)
-        self.assertEqual(self.client.post(PREFIX + "/send-command/all", data="{",
+        self.assertEqual(self.client.post("/send-command/all", data="{",
                                          content_type="application/json").status_code, 400)
-        self.assertEqual(self.client.post(PREFIX + "/send-command/all", data="text",
+        self.assertEqual(self.client.post("/send-command/all", data="text",
                                          content_type="text/plain").status_code, 415)
 
     def test_body_size_limit(self):
-        response = self.client.post(PREFIX + "/send-command/all", json={"padding": "x" * 70000})
+        response = self.client.post("/send-command/all", json={"padding": "x" * 70000})
         self.assertEqual(response.status_code, 413)
 
     def test_invalid_modes_are_rejected_before_job_creation(self):
@@ -248,7 +247,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(job["duration"], 0)
 
     def test_default_and_string_duration(self):
-        response = self.client.post(PREFIX + "/send-command/line", json={"line": "LINE10", "mode": "TURN_OFF"})
+        response = self.client.post("/send-command/line", json={"line": "LINE10", "mode": "TURN_OFF"})
         self.assertEqual(self.wait_job(response)["duration"], 1)
         self.assertEqual(self.wait_job(self.send(line="LINE10", duration="0"))["duration"], 0)
 
@@ -276,7 +275,7 @@ class ApiTests(unittest.TestCase):
     def test_legacy_get_and_post_turn_off_routes(self):
         for method in ("get", "post"):
             with self.subTest(method=method):
-                job = self.wait_job(getattr(self.client, method)(PREFIX + "/send-command/turn-off-all/LINE1"))
+                job = self.wait_job(getattr(self.client, method)("/send-command/turn-off-all/LINE1"))
                 self.assertEqual(job["result"]["success"], 3)
 
     def test_missing_targets_produce_failed_job(self):
@@ -300,7 +299,7 @@ class ApiTests(unittest.TestCase):
         def broken():
             raise RuntimeError("private database failure details")
         self.repository.get_all = broken
-        response = self.client.get(PREFIX + "/get-all-devices")
+        response = self.client.get("/get-all-devices")
         self.assertEqual(response.status_code, 500)
         self.assertNotIn("private", response.get_data(as_text=True))
         job = self.wait_job(self.send("/send-command/all"))
@@ -310,19 +309,19 @@ class ApiTests(unittest.TestCase):
     def test_authentication_covers_every_route(self):
         self.settings.api_key = "test-secret"
         for rule in self.app.url_map.iter_rules():
-            if not rule.rule.startswith(PREFIX):
+            if not rule.endpoint.startswith("api."):
                 continue
             path = rule.rule.replace("<int:keyid>", "1").replace("<line>", "LINE1").replace("<job_id>", "missing")
             for method in rule.methods - {"HEAD", "OPTIONS"}:
                 with self.subTest(path=path, method=method):
                     self.assertEqual(self.client.open(path, method=method).status_code, 401)
-        self.assertEqual(self.client.get(PREFIX + "/get-all-devices", headers={"X-API-Key": "wrong"}).status_code, 401)
-        self.assertEqual(self.client.get(PREFIX + "/get-all-devices", headers={"X-API-Key": "test-secret"}).status_code, 200)
+        self.assertEqual(self.client.get("/get-all-devices", headers={"X-API-Key": "wrong"}).status_code, 401)
+        self.assertEqual(self.client.get("/get-all-devices", headers={"X-API-Key": "test-secret"}).status_code, 200)
 
     def test_authorized_command_and_job_poll(self):
         self.settings.api_key = "test-secret"
         headers = {"X-API-Key": "test-secret"}
-        response = self.client.post(PREFIX + "/send-command/line", json={"line": "LINE10", "mode": "TURN_OFF"}, headers=headers)
+        response = self.client.post("/send-command/line", json={"line": "LINE10", "mode": "TURN_OFF"}, headers=headers)
         self.assertEqual(response.status_code, 202)
         url = response.get_json()["status_url"]
         self.assertEqual(self.client.get(url).status_code, 401)
@@ -335,9 +334,9 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(job["status"], "completed")
 
     def test_unknown_job_route_and_wrong_method(self):
-        self.assertEqual(self.client.get(PREFIX + "/jobs/missing").status_code, 404)
-        self.assertEqual(self.client.get(PREFIX + "/missing").status_code, 404)
-        self.assertEqual(self.client.get(PREFIX + "/send-command/all").status_code, 405)
+        self.assertEqual(self.client.get("/jobs/missing").status_code, 404)
+        self.assertEqual(self.client.get("/missing").status_code, 404)
+        self.assertEqual(self.client.get("/send-command/all").status_code, 405)
 
     def test_request_logs_do_not_mix_concurrent_jobs(self):
         first = self.send(line="LINE1")
@@ -382,8 +381,8 @@ class ApiTests(unittest.TestCase):
         self.history.limit = 2
         jobs = [self.wait_job(self.send(line="LINE10", mode="TURN_OFF")) for _ in range(3)]
         self.assertEqual(len(self.history.list()), 2)
-        self.assertEqual(self.client.get(PREFIX + "/jobs/" + jobs[0]["job_id"]).status_code, 404)
-        self.assertEqual(self.client.get(PREFIX + "/jobs/" + jobs[-1]["job_id"]).status_code, 200)
+        self.assertEqual(self.client.get("/jobs/" + jobs[0]["job_id"]).status_code, 404)
+        self.assertEqual(self.client.get("/jobs/" + jobs[-1]["job_id"]).status_code, 200)
 
     def test_real_connection_timeout_has_clear_error_and_no_traceback(self):
         self.settings.connect_timeout = 0.02
